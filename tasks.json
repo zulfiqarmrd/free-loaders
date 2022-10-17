@@ -1,0 +1,10 @@
+[
+  {
+    "id": 0,
+    "executable_path": "./task0/task.py"
+  },
+  {
+    "id": 1,
+    "executable_path": "./task1/task.py"
+  }
+]
