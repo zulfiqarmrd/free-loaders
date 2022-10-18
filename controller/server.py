@@ -2,6 +2,7 @@ from functools import partial
 import socketserver
 import json
 from http.server import BaseHTTPRequestHandler
+from classes.task import Task
 import cgi
 
 next_offloaded_task_id = 1
@@ -65,7 +66,7 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         input_data = post_input_data["input_data"]
         deadline = post_input_data["deadline"] if "deadline" in fields else DEFAULT_DEADLINE
 
-        self.task_dispatcher.submit_task(device_id, task_id, input_data, deadline)
+        self.task_dispatcher.submit_task(Task(device_id, task_id, input_data, deadline))
 
 
 class ControllerServer:

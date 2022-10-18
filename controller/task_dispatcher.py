@@ -84,12 +84,24 @@ def on_publish(client,userdata,result):
 
 
 class TaskDispatcher:
-    def __init__(self):
+    def __init__(self, rl_scheduler, executers):
+        self.rl_scheduler = rl_scheduler
+        self.executers = executers
+
         # The callback for when the client receives a CONNACK response from the server.
         clientloop_thread = Thread(target=connect)
         clientloop_thread.start()
 
-    def submit_task(self, device_id, task_id, input_data, deadline):
-        print("received with thanks")
+    def send_task_to_executer(self, executer_id, task):
+        # make http request to executer's ip address
+        print(f"task sent to executer's ip {self.executers[executer_id].executer_ip}")
+        pass
+
+    def submit_task(self, task):
+        print(f"[task_dispatcher] received task: {task.task_id}")
 
         # request rl scheduler to schedule this task
+        executer_id = self.rl_scheduler.schedule(task)
+
+        print(f"[task_dispatcher] task needs to be sent to executer {executer_id}")
+        self.send_task_to_executer(executer_id, task)
