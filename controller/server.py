@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler
 from classes.task import Task
 import cgi
 
-next_offloaded_task_id = 1
+next_offload_id = 1
 PORT = 8001
 DEFAULT_DEADLINE = 5000 # 5 seconds
 
@@ -48,17 +48,14 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             return
 
         # if everything proper, assign a new unique task id to it and send it as response
-        global next_offloaded_task_id
+        global next_offload_id
         self._set_response()
         response = {
-            "offloaded_task_id": next_offloaded_task_id
+            "offload_id": next_offload_id
         }
 
         # send the unique offloaded_task_id back as response
         self.wfile.write(json.dumps(response).encode('utf-8'))
-
-        # generate a unique task id
-        next_offloaded_task_id += 1
 
         # send the task to the task dispatcher
         device_id = post_input_data["device_id"]
@@ -66,7 +63,10 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         input_data = post_input_data["input_data"]
         deadline = post_input_data["deadline"] if "deadline" in fields else DEFAULT_DEADLINE
 
-        self.task_dispatcher.submit_task(Task(device_id, task_id, input_data, deadline))
+        self.task_dispatcher.submit_task(Task(next_offload_id, device_id, task_id, input_data, deadline))
+
+        # generate a unique task id for the next task
+        next_offload_id += 1
 
 
 class ControllerServer:

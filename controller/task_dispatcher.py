@@ -6,16 +6,15 @@ import json
 controller_ip = "localhost"
 
 # mqtt topics
-offloader_controller_task_submit_topic = "offl-ctrl-task-submit"  # sub
-offloader_controller_task_response_topic = "offl-ctrl-task-response"  # pub
+controller_offloader_task_response_topic = "ctrl-offl-task-response"  # pub
 
-offloader_controller_feedback_request_topic = "offl-ctrl-feedback-request"  # pub
+controller_offloader_feedback_request_topic = "ctrl-offl-feedback-request"  # pub
 offloader_controller_feedback_response_topic = "offl-ctrl-feedback-response"  # sub
 
-controller_executor_task_execute_topic = "ctrl-exec-task-execute"  # pub
-controller_executor_task_response_topic = "ctrl-exec-task-response"  # sub
+controller_executer_task_execute_topic = "ctrl-exec-task-execute"  # pub
+executer_controller_task_response_topic = "exec-ctrl-task-response"  # sub
 
-controller_executor_state_topic = "ctrl-exec-state"  # sub
+executer_controller_state_topic = "exec-ctrl-state"  # sub
 
 
 # TODO update
@@ -28,10 +27,9 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe(offloader_controller_task_submit_topic)
     client.subscribe(offloader_controller_feedback_response_topic)
-    client.subscribe(controller_executor_task_response_topic)
-    client.subscribe(controller_executor_state_topic)
+    client.subscribe(executer_controller_task_response_topic)
+    client.subscribe(executer_controller_state_topic)
 
 
 def on_message(client, userdata, mqtt_message):
@@ -39,29 +37,26 @@ def on_message(client, userdata, mqtt_message):
     topic = mqtt_message.topic
     payload = mqtt_message.payload
 
-    # print(mqtt_message)
-    # print(topic)
-    print(payload)
+    try:
+        message_json = json.loads(payload)
+        print(message_json)
+    except Exception as e:
+        print(e)
+    else:
+        if topic == offloader_controller_feedback_response_topic:
+            pass
+        elif topic == executer_controller_task_response_topic:
+            # get the response
+            offload_id = message_json["offload_id"]
+            response = message_json["response"]
+            print(f"[task_dispatch] response received for offload_id {offload_id}: {response}")
 
-    if topic == offloader_controller_task_submit_topic:
-        # try:
-        #     message_json = json.loads(payload)
-        #     print(message_json)
-        #     offloaded_task_id = message_json["offloaded_task_id"]
-        #     response = message_json["response"]
-        #
-        #     print(f"[offl -> ctrl] new task received. ")
-        #
-        #     print(f'{offloaded_task_id}, {response}')
-        # except Exception as e:
-        #     print(e)
-        pass
-    elif topic == offloader_controller_feedback_response_topic:
-        pass
-    elif topic == controller_executor_task_response_topic:
-        pass
-    elif topic == controller_executor_state_topic:
-        pass
+            # publish this to the offloader
+            client.publish(controller_offloader_task_response_topic, json.dumps(message_json).encode('utf-8'))
+            print(f"[task_dispatch] response for offload_id {offload_id} forwarded to offloader")
+
+        elif topic == executer_controller_state_topic:
+            pass
 
 
 def on_disconnect(client, userdata, rc=0):
@@ -69,14 +64,13 @@ def on_disconnect(client, userdata, rc=0):
     client.loop_stop()
 
 
-def connect():
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.on_disconnect = on_disconnect
+def connect(mqtt_client):
+    mqtt_client.on_connect = on_connect
+    mqtt_client.on_message = on_message
+    mqtt_client.on_disconnect = on_disconnect
 
-    client.connect("localhost", 1883, 60)
-    client.loop_forever()
+    mqtt_client.connect("localhost", 1883, 60)
+    mqtt_client.loop_forever()
 
 
 def on_publish(client,userdata,result):
@@ -87,15 +81,25 @@ class TaskDispatcher:
     def __init__(self, rl_scheduler, executers):
         self.rl_scheduler = rl_scheduler
         self.executers = executers
+        self.tasks = {}
+
+        self.mqtt_client = mqtt.Client()
 
         # The callback for when the client receives a CONNACK response from the server.
-        clientloop_thread = Thread(target=connect)
+        clientloop_thread = Thread(target=connect, args=(self.mqtt_client,))
         clientloop_thread.start()
 
     def send_task_to_executer(self, executer_id, task):
-        # make http request to executer's ip address
-        print(f"task sent to executer's ip {self.executers[executer_id].executer_ip}")
-        pass
+        # publish on mqtt to executer
+        # assumption: each executer knows its id
+        task_request_msg = {
+            "executer_id": executer_id,
+            "offload_id": task.offload_id,
+            "task_id": task.task_id,
+            "input_data": task.input_data
+        }
+        self.mqtt_client.publish(controller_executer_task_execute_topic, json.dumps(task_request_msg).encode('utf-8'))
+        print(f"task sent for execution to executer {self.executers[executer_id].executer_ip}")
 
     def submit_task(self, task):
         print(f"[task_dispatcher] received task: {task.task_id}")
@@ -105,3 +109,6 @@ class TaskDispatcher:
 
         print(f"[task_dispatcher] task needs to be sent to executer {executer_id}")
         self.send_task_to_executer(executer_id, task)
+
+        # save the task for future reference
+        self.tasks[task.offload_id] = task
