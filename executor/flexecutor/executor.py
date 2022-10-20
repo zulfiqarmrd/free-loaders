@@ -74,7 +74,7 @@ def __mqtt_message_received(client, data, msg):
             log.d('task not for this instance (ours: {} != requested: {})'.format(
                 our_id, task_request['executer_id']))
         else:
-            __execute_task(client, msg.payload)
+            __execute_task(client, task_request)
 
 def __execute_task(client, task_request):
     '''Begin executing a task in a new thread.
