@@ -2,11 +2,11 @@ import argparse
 import time
 
 import log
-import messaging
+import service
 
 def main(args):
     log.set_level(args.log_level)
-    state_publisher_thread = messaging.start_state_publisher(args.controller)
+    state_http_server_thread = service.start_state_server()
 
     # Idle around.
     while True:
@@ -14,7 +14,6 @@ def main(args):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='fReeLoaders executor.')
-    ap.add_argument('controller', metavar='ADDR', help='Address of the controller.')
     ap.add_argument('-l', '--log-level', metavar='LEVEL', help='Set the logging level.',
                     choices=['e', 'w', 'i', 'd'])
 
