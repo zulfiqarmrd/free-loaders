@@ -25,6 +25,8 @@ def fetch():
         'cpu-load': psutil.getloadavg()[0],
         'free-ram': mem.available,
         'total-ram': mem.total,
+        'has-gpu': gpu_stats['has-gpu'],
+        'gpu-load': gpu_stats['usage'],
         'free-vram': gpu_stats['free-vram'],
         'total-vram': gpu_stats['total-vram'],
         'process-count': proc_count,
@@ -51,6 +53,7 @@ def _gpu_stats():
     '''
 
     stats = {
+        'has-gpu': 0,
         'usage': 0,
         'free-vram': 0,
         'total-vram': 0,
@@ -59,6 +62,7 @@ def _gpu_stats():
     # Look at the kernel build to tell if this is a Jetson SBC.
     if os.uname().release.endswith('-tegra'):
         import jtop
+        stats['has-gpu'] = 1
         with jtop.jtop() as jetson_ctx:
             if jetson_ctx.ok():
                 stats['usage'] = jetson_ctx.stats['GPU']
