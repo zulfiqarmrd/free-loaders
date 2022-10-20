@@ -15,8 +15,6 @@ offloader_controller_feedback_response_topic = "offl-ctrl-feedback-response"  # 
 controller_executer_task_execute_topic = "ctrl-exec-task-execute"  # pub
 executer_controller_task_response_topic = "exec-ctrl-task-response"  # sub
 
-executer_controller_state_topic = "exec-ctrl-state"  # sub
-
 
 # TODO update
 def request_feedback(self, task_id, feedback):
@@ -54,7 +52,6 @@ def on_connect(client, userdata, flags, rc):
     # reconnect then subscriptions will be renewed.
     client.subscribe(offloader_controller_feedback_response_topic)
     client.subscribe(executer_controller_task_response_topic)
-    client.subscribe(executer_controller_state_topic)
 
 
 def on_message(client, userdata, mqtt_message):
@@ -76,12 +73,12 @@ def on_message(client, userdata, mqtt_message):
             response = message_json["response"]
             print(f"[task_dispatch] response received for offload_id {offload_id}: {response}")
 
+            del message_json["state"]
+
+
             # publish this to the offloader
             client.publish(controller_offloader_task_response_topic, json.dumps(message_json).encode('utf-8'))
             print(f"[task_dispatch] response for offload_id {offload_id} forwarded to offloader")
-
-        elif topic == executer_controller_state_topic:
-            pass
 
 
 def on_disconnect(client, userdata, rc=0):
