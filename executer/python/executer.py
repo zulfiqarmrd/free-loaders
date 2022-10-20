@@ -14,10 +14,10 @@ controller_ip = sys.argv[2]
 controller_executer_task_execute_topic = "ctrl-exec-task-execute"  # sub
 executer_controller_task_response_topic = "exec-ctrl-task-response"  # pub
 
+# TODO update this
 def execute_task(offload_id, task_id, input_data, on_execution_finished):
     print(f"[executer] executing task with offload_id {offload_id}")
     on_execution_finished(offload_id, "this is the response")
-    pass
 
 
 def on_connect(client, userdata, flags, rc):
@@ -27,15 +27,20 @@ def on_connect(client, userdata, flags, rc):
     # reconnect then subscriptions will be renewed.
     client.subscribe(controller_executer_task_execute_topic)
 
+# TODO update this
+def get_system_state():
+    return ""
+
 def on_task_execution_finished(offload_id, task_response):
-    # TODO get the state of the executer
+    state = get_system_state()
     executer_response = {
         "offload_id": offload_id,
         "response": task_response,
-        "state": ""
+        "state": state
     }
     mqtt_client.publish(executer_controller_task_response_topic, json.dumps(executer_response).encode('utf-8'))
     print(f"[executer] response for offload_id {offload_id} sent to controller")
+
 
 def on_message(client, userdata, mqtt_message):
     # mqtt_message is of type MQTTMessage. Has fields topic, payload,..
@@ -56,7 +61,6 @@ def on_message(client, userdata, mqtt_message):
 
                 print(f"[executer] task received for execution with offload_id {offload_id}")
                 execute_task(offload_id, task_id, input_data, on_task_execution_finished)
-
 
 
 def on_disconnect(client, userdata, rc=0):
