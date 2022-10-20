@@ -4,5 +4,5 @@ class RLScheduler:
         self.state = state
 
     # TODO update
-    def schedule(self, task):
+    def schedule(self, before_state, task):
         return 0

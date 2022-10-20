@@ -1,9 +1,10 @@
 from threading import Thread
-
 import paho.mqtt.client as mqtt
 import json
+import asyncio
+from aiohttp import ClientSession, ClientConnectorError
 
-controller_ip = "localhost"
+executer_server_port = 7000
 
 # mqtt topics
 controller_offloader_task_response_topic = "ctrl-offl-task-response"  # pub
@@ -20,6 +21,30 @@ executer_controller_state_topic = "exec-ctrl-state"  # sub
 # TODO update
 def request_feedback(self, task_id, feedback):
     pass
+
+
+async def fetch_json(executer_id: int, url: str, session: ClientSession, **kwargs) -> tuple:
+    try:
+        print(f'in fetch_json. about to request {url}')
+        resp = await session.request(method="GET", url=url, **kwargs)
+        print("resp done")
+        response_json = await resp.json()
+        print(response_json)
+    except ClientConnectorError:
+        return executer_id, url, 404
+    return executer_id, response_json
+
+
+async def make_requests(url_tuples: list, **kwargs) -> None:
+    async with ClientSession() as session:
+        tasks = []
+        for url_tuple in url_tuples:
+            tasks.append(
+                fetch_json(executer_id=url_tuple[0], url=url_tuple[1], session=session, **kwargs)
+            )
+        results = await asyncio.gather(*tasks)
+
+    return results
 
 
 def on_connect(client, userdata, flags, rc):
@@ -101,11 +126,22 @@ class TaskDispatcher:
         self.mqtt_client.publish(controller_executer_task_execute_topic, json.dumps(task_request_msg).encode('utf-8'))
         print(f"task sent for execution to executer {self.executers[executer_id].executer_ip}")
 
+    def get_executer_state(self):
+        # create a list of all executer ips with a specific http endpoint
+        executer_items = list(self.executers.items())
+        url_tuples = list(map(lambda item: (item[0], f'http://{item[1].executer_ip}:{executer_server_port}/state'), executer_items))
+
+        print(url_tuples)
+        return asyncio.run(make_requests(url_tuples=url_tuples))
+
     def submit_task(self, task):
         print(f"[task_dispatcher] received task: {task.task_id}")
 
+        # query all executers for their state
+        before_state = self.get_executer_state()
+
         # request rl scheduler to schedule this task
-        executer_id = self.rl_scheduler.schedule(task)
+        executer_id = self.rl_scheduler.schedule(before_state, task)
 
         print(f"[task_dispatcher] task needs to be sent to executer {executer_id}")
         self.send_task_to_executer(executer_id, task)
