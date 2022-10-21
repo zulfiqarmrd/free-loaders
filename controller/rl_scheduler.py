@@ -15,9 +15,8 @@ import numpy as np
 
 
 class RLScheduler:
-    def __init__(self, executers, state):
+    def __init__(self, executers):
         self.executers = executers
-        self.state = state
 
     def get_state(self, state, task):
 
