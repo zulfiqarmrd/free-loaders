@@ -11,11 +11,9 @@ executers = {
     3: Executer(3, "localhost"),
     4: Executer(4, "localhost")
 }
-# TODO update initial state
-initial_rl_state = {}
 
 # initialize the RLScheduler
-rl_scheduler = RLScheduler(executers, initial_rl_state)
+rl_scheduler = RLScheduler(executers)
 
 # start the task dispatcher
 task_dispatcher = TaskDispatcher(rl_scheduler, executers)
