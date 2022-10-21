@@ -27,10 +27,19 @@ class RLScheduler:
 
         return updated_state
 
+    def generate_new_state(before_task, new_state, exec_id):
+        # calculate new state
 
-    def generate_reward(self, task, exec_time):
+        return 0
 
-        if exec_time < task.deadline:
+
+    def get_before_state(self, offload_id):
+        # return state from the table
+        return 0
+
+    def generate_reward(self, deadline, exec_time):
+
+        if exec_time < deadline:
             # TO_DO
             reward = 1
 
@@ -46,21 +55,6 @@ class RLScheduler:
         #if reached plateau return 1, else return 0
 
         return 0
-
-    def execute_task(self, executers_id, task):
-
-        # start_timer
-        start_time = time.time()
-        new_observation = execute(executers_id, task) # to_do
-        end_time = time.time()
-
-        exec_time = end_time - start_time
-
-        reward = self.generate_reward(task, exec_time)
-
-        done = self.done_with_learning(reward)
-
-        return new_observation, reward, done
 
     def schedule(self, before_state, task):
 
@@ -106,23 +100,32 @@ class RLScheduler:
         total_losses = []
 
         start = time.time()
-        for epoch in range(epoch_num):
+        #for epoch in range(epoch_num):
 
-            pobs = self.get_state(before_state, task)
-            done = False
-            total_reward = 0
-            total_loss = 0
+        pobs = self.get_state(before_state, task)
+        done = False
+        total_reward = 0
+        total_loss = 0
 
-            while not done: #update
+        #    while not done: #update
 
-                # select act
-                pact = np.random.randint(2) # update with executers id
-                if np.random.rand() > epsilon:
-                    pact = Q(np.array(pobs, dtype=np.float32).reshape(1, -1))
-                    pact = np.argmax(pact.data)
+        # select act
+        pact = np.random.randint(2) # update with executers id
+        if np.random.rand() > epsilon:
+            pact = Q(np.array(pobs, dtype=np.float32).reshape(1, -1))
+            pact = np.argmax(pact.data)
 
-                # act
-                obs, reward, done = self.execute_task(pact, task)
+        return pact
+
+
+    def task_finished(self, task, exec_time, new_state, exec_id):
+
+        before_state = self.get_before_state(task.offload_id)
+
+        obs = self.generate_new_state(before_state, new_state, exec_id)
+        reward = self.generate_reward(task.deadline, exec_time)
+        done = self.done_with_learning(reward)
+
 
                 # add memory
                 memory.append((pobs, pact, reward, obs, done))
