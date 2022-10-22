@@ -11,8 +11,6 @@ class NumpyEncoder(json.JSONEncoder):
 # input_data in this format:
 # {"a": [[0.5, 1, 2, 3], [0, 1, 2, 3], [0.5, 1, 2, 3], [0, 1, 2, 3]], "b": [[..],[..],[..],[..]]}
 def run_mm_task(input_data):
-    print("in mm_task")
-    print(input_data)
     a = np.array(input_data["a"])
     b = np.array(input_data["b"])
     res = np.matmul(a, b)
@@ -23,6 +21,8 @@ if __name__ == '__main__':
     if len(sys.argv) != 2:
         print("needs input_data as arg")
         sys.exit(1)
-    # a = np.random.rand(4,4)
-    # b = np.random.rand(4,4)
+    # code to generate matrix input in json format:
+    # a = np.random.rand(1000,1000)
+    # b = np.random.rand(1000,1000)
+    # print(json.dumps({"a": a, "b": b}, cls=NumpyEncoder))
     run_mm_task(sys.argv[1])

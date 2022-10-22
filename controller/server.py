@@ -36,7 +36,6 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
             # read the message and convert it into a python dictionary
             length = int(self.headers['content-length'])
             post_input_data = json.loads(self.rfile.read(length))
-            print(post_input_data)
 
             # do some sanity checks
             fields = post_input_data.keys()
