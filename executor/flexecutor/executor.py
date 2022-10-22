@@ -69,7 +69,7 @@ def __mqtt_message_received(client, data, msg):
 
     if msg.topic == MQTTTopicExecuteTask:
         task_request = json.loads(msg.payload)
-        log.i('task request: {}'.format(task_request))
+        log.i('request to execute: {}'.format(task_request['task_id']))
         # Look at the executor ID to see if the task is really for this instance.
         our_id = data['executor_id']
         if task_request['executer_id'] != data['executor_id']:
