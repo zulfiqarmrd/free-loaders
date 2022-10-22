@@ -5,11 +5,7 @@ from classes.executer import Executer
 
 # TODO read executors from json
 executers = {
-    0: Executer(0, "localhost"),
-    1: Executer(1, "localhost"),
-    2: Executer(2, "localhost"),
-    3: Executer(3, "localhost"),
-    4: Executer(4, "localhost")
+    0: Executer(0, "localhost")
 }
 
 # initialize the RLScheduler

@@ -23,50 +23,54 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        # receive the task parameters
-        ctype, pdict = cgi.parse_header(self.headers['content-type'])
+        if self.path == '/submit-task':
+            # receive the task parameters
+            ctype, pdict = cgi.parse_header(self.headers['content-type'])
 
-        # refuse to receive non-json content
-        if ctype != 'application/json':
-            self.send_response(400)
-            self.end_headers()
-            return
+            # refuse to receive non-json content
+            if ctype != 'application/json':
+                self.send_response(400)
+                self.end_headers()
+                return
 
-        # read the message and convert it into a python dictionary
-        length = int(self.headers['content-length'])
-        post_input_data = json.loads(self.rfile.read(length))
-        print(post_input_data)
+            # read the message and convert it into a python dictionary
+            length = int(self.headers['content-length'])
+            post_input_data = json.loads(self.rfile.read(length))
+            print(post_input_data)
 
-        # do some sanity checks
-        fields = post_input_data.keys()
-        if "device_id" not in fields or "task_id" not in fields or "input_data" not in fields:
-            self.send_response(400)
-            self.send_header('Content-type', 'text/plain')
-            self.end_headers()
-            response = "ERROR: some of these fields seem to be missing: device_id, task_id, input_data"
+            # do some sanity checks
+            fields = post_input_data.keys()
+            if "device_id" not in fields or "task_id" not in fields or "input_data" not in fields:
+                self.send_response(400)
+                self.send_header('Content-type', 'text/plain')
+                self.end_headers()
+                response = "ERROR: some of these fields seem to be missing: device_id, task_id, input_data"
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                return
+
+            # if everything proper, assign a new unique task id to it and send it as response
+            global next_offload_id
+            self._set_response()
+            response = {
+                "offload_id": next_offload_id
+            }
+
+            # send the unique offloaded_task_id back as response
             self.wfile.write(json.dumps(response).encode('utf-8'))
-            return
 
-        # if everything proper, assign a new unique task id to it and send it as response
-        global next_offload_id
-        self._set_response()
-        response = {
-            "offload_id": next_offload_id
-        }
+            # send the task to the task dispatcher
+            device_id = post_input_data["device_id"]
+            task_id = post_input_data["task_id"]
+            input_data = post_input_data["input_data"]
+            deadline = post_input_data["deadline"] if "deadline" in fields else DEFAULT_DEADLINE
 
-        # send the unique offloaded_task_id back as response
-        self.wfile.write(json.dumps(response).encode('utf-8'))
+            self.task_dispatcher.submit_task(Task(next_offload_id, device_id, task_id, input_data, deadline))
 
-        # send the task to the task dispatcher
-        device_id = post_input_data["device_id"]
-        task_id = post_input_data["task_id"]
-        input_data = post_input_data["input_data"]
-        deadline = post_input_data["deadline"] if "deadline" in fields else DEFAULT_DEADLINE
+            # generate a unique task id for the next task
+            next_offload_id += 1
+        else:
+            self.send_response(404)
 
-        self.task_dispatcher.submit_task(Task(next_offload_id, device_id, task_id, input_data, deadline))
-
-        # generate a unique task id for the next task
-        next_offload_id += 1
 
 
 class ControllerServer:
