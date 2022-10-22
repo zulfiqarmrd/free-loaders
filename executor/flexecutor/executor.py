@@ -6,6 +6,7 @@ import time
 import paho.mqtt.client
 
 import stats
+from tasker.loop import run_loop_task
 
 # MQTT server port; fixed to 1883.
 MQTTServerPort = 1883
@@ -97,6 +98,13 @@ def __executor_task_entry(mqtt_client, task_request):
 
     log.i('executing task')
     # Execute task here.
+    task_id = task_request['task_id']
+    res = ""
+    if task_id < 50:
+        res = run_loop_task(task_request['task_id'], task_request['input_data'])
+    else:
+        pass
+
     log.i('completed executing task')
 
     # Collect current state and send it, along with the result.
@@ -105,7 +113,7 @@ def __executor_task_entry(mqtt_client, task_request):
         'executor_id': task_request['executer_id'],
         'task_id': task_request['task_id'],
         'offload_id': task_request['offload_id'],
-        'result': '', # TODO: pull this from the computed result.
+        'result': res,
         'state': current_state,
     }
     mqtt_client.publish(MQTTTopicTaskResponse,
