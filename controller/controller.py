@@ -3,9 +3,19 @@ from task_dispatcher import TaskDispatcher
 from rl_scheduler import RLScheduler
 from classes.executer import Executer
 
-# TODO read executors from json
+# TODO remove and add to executers.json
 executers = {
-    0: Executer(0, "localhost")
+    0: Executer(0, "172.27.171.223"),  # rpi2
+    1: Executer(1, "172.27.153.31"),  # nano
+    2: Executer(2, "172.27.150.233"),  # rpi3
+    3: Executer(2, "172.27.138.171"),  # rpi4
+    4: Executer(2, "172.27.139.169"),  # rpi4
+    5: Executer(2, "172.27.129.215"),  # rpi4
+    6: Executer(2, "172.27.184.237"),  # rpi4
+    7: Executer(2, "172.27.151.135"),  # rpi4
+    8: Executer(3, "172.27.130.255"),  # tx2
+    9: Executer(4, "172.27.133.131"),  # desktop
+    # 10: Executer(10, "172.27.134.111"),  # rpi3 - backup
 }
 
 # initialize the RLScheduler
