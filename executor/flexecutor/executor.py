@@ -7,6 +7,7 @@ import paho.mqtt.client
 
 import stats
 from tasker.loop import run_loop_task
+from tasker.mm import run_mm_task
 
 # MQTT server port; fixed to 1883.
 MQTTServerPort = 1883
@@ -102,8 +103,12 @@ def __executor_task_entry(mqtt_client, task_request):
     res = ""
     if task_id < 50:
         res = run_loop_task(task_request['task_id'], task_request['input_data'])
-    else:
+    elif 50 <= task_id < 100:
+        res = run_mm_task(task_request['input_data'])
+    elif 100 <= task_id < 150:
         pass
+    else:
+        print(f'ERROR: task_id {task_id} is undefined')
 
     log.i('completed executing task')
 
