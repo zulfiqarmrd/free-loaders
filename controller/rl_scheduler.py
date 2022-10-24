@@ -86,14 +86,12 @@ class RLScheduler:
 
         return 0
 
-    # TODO: Update the reward function
     def generate_reward(self, deadline, exec_time):
 
-        if exec_time < deadline:
-            reward = 1
-
+        if exec_time > deadline:
+            reward = -np.tanh(exec_time/deadline)
         else:
-            reward = -1
+            reward = 1-np.tanh(exec_time/(deadline+exec_time))
 
         return reward
 
