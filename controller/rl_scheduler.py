@@ -3,13 +3,14 @@ import os
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 
+import csv
 import time
 import copy
 import chainer
 import chainer.functions as F
 import chainer.links as L
 import numpy as np
-
+from chainer import serializers
 
 class RLScheduler:
 
@@ -37,7 +38,7 @@ class RLScheduler:
         self.total_executor = 10
 
         #ToDo, update input size
-        self.Q = Q_Network(input_size=12, hidden_size=100, output_size=self.total_executor)
+        self.Q = Q_Network(input_size=102, hidden_size=100, output_size=self.total_executor)
 
         self.Q_ast = copy.deepcopy(self.Q)
         self.optimizer = chainer.optimizers.Adam()
@@ -73,18 +74,29 @@ class RLScheduler:
 
         return state, act, deadline
 
-    # TODO: Process state and task into correct format
-    def process_state(self, state, task):
+    def process_state(self, before_state, task):
 
-        updated_state = state + task
+        state = []
 
-        return updated_state
+        task_id_vec = [ord(c) for c in task.task_id]
 
-    # TODO: Get latest state from old state and exec_id
-    def generate_new_state(self, before_state, new_state, exec_id):
-        # calculate new state
+        state.append(task_id_vec)
+        state.append(task.deadline)
 
-        return 0
+        for key in before_state:
+            key_vec = [ord(c) for c in key]
+            state.append(key_vec)
+
+            state.extend(list(before_state[key].values()))
+
+        return state
+
+    def generate_new_state(self, before_state, new_state_of_executor, exec_id):
+
+        new_state = before_state
+        new_state[exec_id] = new_state_of_executor
+
+        return new_state
 
     def generate_reward(self, deadline, exec_time):
 
@@ -117,11 +129,11 @@ class RLScheduler:
         return pact
 
 
-    def task_finished(self, offload_id, exec_time, new_state, exec_id):
+    def task_finished(self, offload_id, exec_time, new_state_of_executor, exec_id):
 
         pobs, pact, deadline = self.get_saved_state(offload_id)
 
-        obs = self.generate_new_state(pobs, new_state, exec_id)
+        obs = self.generate_new_state(pobs, new_state_of_executor, exec_id)
         reward = self.generate_reward(deadline, exec_time)
         done = self.done_with_learning(reward)
 
@@ -132,6 +144,8 @@ class RLScheduler:
 
         # train or update q
         if len(self.memory) == self.memory_size:
+
+            f = open('result/reward_loss.csv', 'a', newline='')
 
             for epoch in range(self.epoch_num):
 
@@ -180,6 +194,9 @@ class RLScheduler:
                 log_loss = sum(self.total_losses[((epoch + 1) - self.show_log_freq):]) / self.show_log_freq
                 print('\t'.join(map(str, [epoch + 1, self.epsilon, self.total_step, log_reward, log_loss])))
 
-        # save Q, total_losses, total_rewards
+            # save Q, total_losses, total_rewards
+            writer = csv.writer(f)
+            writer.writerow([str(total_reward), str(total_loss)])
+            f.close()
 
-
+            serializers.save_npz('SavedModels/Q.model', self.Q)
