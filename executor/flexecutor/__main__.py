@@ -4,9 +4,11 @@ import time
 import executor
 import log
 import service
+import stats
 
 def main(args):
     log.set_level(args.log_level)
+    gpu_monitor_thread = stats.start_gpu_monitor_thread()
     state_http_server_thread = service.start_state_server()
     executor_server_thread = executor.start_executor(
         args.controller, args.id)

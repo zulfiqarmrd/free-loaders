@@ -1,7 +1,22 @@
 import functools
+import multiprocessing
 import os
+import threading
+import time
 
 import psutil
+
+import log
+
+def start_gpu_monitor_thread():
+    '''Starts a GPU-monitoring thread.
+    '''
+
+    t = threading.Thread(name='gpu-monitor',
+                         target=__gpu_load_entry)
+    t.start()
+
+    return t
 
 def fetch():
     '''Returns a dictionary of system state information.
@@ -26,7 +41,7 @@ def fetch():
         'free-ram': mem.available,
         'total-ram': mem.total,
         'has-gpu': gpu_stats['has-gpu'],
-        'gpu-load': gpu_stats['usage'],
+        'gpu-load': gpu_stats['load'],
         'free-vram': gpu_stats['free-vram'],
         'total-vram': gpu_stats['total-vram'],
         'process-count': proc_count,
@@ -54,7 +69,7 @@ def _gpu_stats():
 
     stats = {
         'has-gpu': 0,
-        'usage': 0,
+        'load': 0,
         'free-vram': 0,
         'total-vram': 0,
     }
@@ -65,9 +80,65 @@ def _gpu_stats():
         stats['has-gpu'] = 1
         with jtop.jtop() as jetson_ctx:
             if jetson_ctx.ok():
-                stats['usage'] = jetson_ctx.stats['GPU']
+                stats['load'] = _get_gpu_load()
                 # Note: SoC shares RAM between CPU and GPU.
                 stats['free-vram'] = jetson_ctx.stats['RAM']
                 stats['total-vram'] = psutil.virtual_memory().total
 
     return stats
+
+__GPULoad = 0
+__GPULoadCollectInterval = .25
+__GPULoadHistory = 60 / __GPULoadCollectInterval
+__GPUUsagesCollected = 0.0
+__GPULoadLock = multiprocessing.Lock()
+
+def __gpu_load_entry():
+    '''Entry point for GPU monitoring thread.
+    '''
+
+    global __GPULoad
+    global __GPULoadHistory
+    global __GPUUsagesCollected
+    global __GPULoadLock
+
+    log.i('started')
+
+    if os.uname().release.endswith('-tegra'):
+        # Collect load information.
+        import jtop
+        with jtop.jtop() as jetson_ctx:
+            while True:
+                if jetson_ctx.ok():
+                    current_gpu_usage = jetson_ctx.stats['GPU']
+                    if __GPUUsagesCollected < __GPULoadHistory:
+                        __GPUUsagesCollected = __GPUUsagesCollected + 1
+
+                    __GPULoadLock.acquire()
+                    if __GPUUsagesCollected == 1:
+                        __GPULoad = current_gpu_usage
+                    else:
+                        __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_gpu_usage * (1.0 / __GPULoadHistory))
+                    log.d('gpu-load: {}'.format(__GPULoad))
+                    __GPULoadLock.release()
+                else:
+                    log.e('unable to collect GPU load data')
+                    time.sleep(3)
+            time.sleep(__GPULoadCollectInterval)
+    else:
+        log.i('GPU monitor exiting because nothing to monitor')
+        return
+
+def _get_gpu_load():
+    '''Returns the value for GPU load.
+    '''
+
+    global __GPULoad
+    global __GPULoadHistory
+    global __GPUUsagesCollected
+    global __GPULoadLock
+    __GPULoadLock.acquire()
+    l = __GPULoad
+    __GPULoadLock.release()
+
+    return l
