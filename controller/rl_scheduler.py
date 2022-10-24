@@ -23,13 +23,17 @@ class RLScheduler:
                 super(Q_Network, self).__init__(
                     fc1=L.Linear(input_size, hidden_size),
                     fc2=L.Linear(hidden_size, hidden_size),
-                    fc3=L.Linear(hidden_size, output_size)
+                    fc3=L.Linear(hidden_size, hidden_size),
+                    fc4=L.Linear(hidden_size, hidden_size),
+                    fc5=L.Linear(hidden_size, output_size)
                 )
 
             def __call__(self, x):
                 h = F.relu(self.fc1(x))
                 h = F.relu(self.fc2(h))
-                y = self.fc3(h)
+                h = F.relu(self.fc3(h))
+                h = F.relu(self.fc4(h))
+                y = self.fc5(h)
                 return y
 
             def reset(self):
@@ -38,7 +42,7 @@ class RLScheduler:
         self.total_executor = 10
 
         #ToDo, update input size
-        self.Q = Q_Network(input_size=102, hidden_size=100, output_size=self.total_executor)
+        self.Q = Q_Network(input_size=102, hidden_size=400, output_size=self.total_executor)
 
         self.Q_ast = copy.deepcopy(self.Q)
         self.optimizer = chainer.optimizers.Adam()
