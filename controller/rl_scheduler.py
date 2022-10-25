@@ -151,10 +151,10 @@ class RLScheduler:
 
             f = open('result/reward_loss.csv', 'a', newline='')
 
-            for epoch in range(self.epoch_num):
+            total_reward = 0
+            total_loss = 0
 
-                total_reward = 0
-                total_loss = 0
+            for epoch in range(self.epoch_num):
 
                 if self.total_step % self.train_freq == 0:
                     shuffled_memory = np.random.permutation(self.memory)
@@ -169,7 +169,7 @@ class RLScheduler:
                         b_obs = np.array(batch[:, 3].tolist(), dtype=np.float32).reshape(self.batch_size, -1)
                         b_done = np.array(batch[:, 4].tolist(), dtype=np.bool)
                         q = self.Q(b_pobs)
-                        maxq = np.max(Q_ast(b_obs).data, axis=1)
+                        maxq = np.max(self.Q_ast(b_obs).data, axis=1)
                         target = copy.deepcopy(q.data)
                         for j in range(self.batch_size):
                             target[j, b_pact[j]] = b_reward[j] + self.gamma * maxq[j] * (not b_done[j])
@@ -180,7 +180,7 @@ class RLScheduler:
                         self.optimizer.update()
 
                 if self.total_step % self.update_q_freq == 0:
-                    Q_ast = copy.deepcopy(self.Q)
+                    self.Q_ast = copy.deepcopy(self.Q)
 
                 # epsilon
                 if self.epsilon > self.epsilon_min and self.total_step > self.start_reduce_epsilon:
