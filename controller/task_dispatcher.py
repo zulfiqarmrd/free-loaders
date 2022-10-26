@@ -71,7 +71,6 @@ class TaskDispatcher:
 
         try:
             message_json = json.loads(payload)
-            print(message_json)
         except Exception as e:
             print(e)
         else:
@@ -82,16 +81,15 @@ class TaskDispatcher:
                 offload_id = message_json["offload_id"]
                 state_of_executor = message_json["state"]
                 executor_id = message_json["executor_id"]
-                print(f"[task_dispatch] response received for offload_id {offload_id}")
-
+                print(f"[task_dispatch] response received for offload_id {offload_id} from executor {executor_id}")
                 print(f'state of executor = {state_of_executor}')
 
                 # compute execution time
                 exec_time_ms = (time.time() - execution_times[offload_id]) * 1000
-                print(f'[task_dispatcher] execution time for offload_id {offload_id} = {exec_time_ms}')
+                print(f'[task_dispatcher] time for offload_id {offload_id} on executor {executor_id} = {exec_time_ms}')
 
                 # give the feedback to the rl scheduler
-                self.rl_scheduler.task_finished(offload_id, exec_time_ms, state_of_executor, executor_id)
+                self.rl_scheduler.task_finished(offload_id, exec_time_ms, state_of_executor, str(executor_id))
 
                 del message_json["state"] # exclude state from being sent to the offloader
                 # publish this to the offloader
@@ -131,9 +129,7 @@ class TaskDispatcher:
     def get_executer_state(self):
         # create a list of all executer ips with a specific http endpoint
         executer_items = list(self.executers.items())
-        url_tuples = list(map(lambda item: (item[0], f'http://{item[1].executer_ip}:{executer_server_port}/state'), executer_items))
-
-        print(url_tuples)
+        url_tuples = list(map(lambda item: (str(item[0]), f'http://{item[1].executer_ip}:{executer_server_port}/state'), executer_items))
         return dict(asyncio.run(make_requests(url_tuples=url_tuples)))
 
     def submit_task(self, task):

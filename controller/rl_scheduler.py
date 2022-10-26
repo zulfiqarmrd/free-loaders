@@ -82,7 +82,7 @@ class RLScheduler:
 
         state = []
 
-        task_id_vec = [ord(c) for c in task.task_id]
+        task_id_vec = [ord(c) for c in str(task.task_id)]
 
         state.append(task_id_vec)
         state.append(task.deadline)
