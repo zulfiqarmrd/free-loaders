@@ -8,6 +8,7 @@ import paho.mqtt.client
 import stats
 from tasker.loop import run_loop_task
 from tasker.mm import run_mm_task
+from tasker.img_classification import run_img_classification_task
 
 # MQTT server port; fixed to 1883.
 MQTTServerPort = 1883
@@ -106,7 +107,7 @@ def __executor_task_entry(mqtt_client, task_request):
     elif 50 <= task_id < 100:
         res = run_mm_task(task_request['input_data'])
     elif 100 <= task_id < 150:
-        pass
+        res = run_img_classification_task(task_request['task_id'], task_request['input_data'])
     else:
         print(f'ERROR: task_id {task_id} is undefined')
 
