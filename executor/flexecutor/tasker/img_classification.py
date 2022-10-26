@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from torchvision import transforms
-from PIL import Image
+#from torchvision import transforms
+#from PIL import Image
 
 class Classifier(nn.Module):
     def __init__(self, hidden_layer_neurons):
