@@ -39,7 +39,7 @@ class RLScheduler:
             def reset(self):
                 self.zerograds()
 
-        self.total_executor = 10
+        self.total_executor = len(executers.keys())
 
         #ToDo, update input size
         self.Q = Q_Network(input_size=102, hidden_size=400, output_size=self.total_executor)
