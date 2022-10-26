@@ -1,7 +1,7 @@
 from functools import partial
-import socketserver
 import json
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 from classes.task import Task
 import cgi
 
@@ -70,7 +70,8 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
 
-
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Handle requests in a separate thread."""
 
 class ControllerServer:
     def __init__(self, task_dispatcher):
@@ -81,6 +82,6 @@ class ControllerServer:
         # ref: https://stackoverflow.com/a/52046062
         handler = partial(MyHTTPRequestHandler, self.task_dispatcher)
 
-        with socketserver.TCPServer(("", PORT), handler) as httpd:
-            print("[server] started serving at port", PORT)
-            httpd.serve_forever()
+        server = ThreadedHTTPServer(("localhost", PORT), handler)
+        print("[server] starting serving at port", PORT)
+        server.serve_forever()

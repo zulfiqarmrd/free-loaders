@@ -24,11 +24,8 @@ def request_feedback(self, task_id, feedback):
 
 
 async def fetch_json(executer_id: int, url: str, session: ClientSession, **kwargs) -> tuple:
-    try:
-        resp = await session.request(method="GET", url=url, **kwargs)
-        response_json = await resp.json()
-    except ClientConnectorError:
-        return executer_id, url, 404
+    resp = await session.request(method="GET", url=url, **kwargs)
+    response_json = await resp.json()
     return executer_id, response_json
 
 
