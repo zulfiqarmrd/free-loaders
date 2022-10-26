@@ -30,10 +30,10 @@ class Classifier(nn.Module):
 
 # input_data: {"image": [flattened 3x32x32 = 3072]}
 def run_img_classification_task(task_id, input_data):
-    # unsqueeze: 3072 -> 1x3072
-    images = torch.tensor(input_data["image"]).unsqueeze(0)
-
     dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+    # unsqueeze: 3072 -> 1x3072
+    images = torch.tensor(input_data["image"]).unsqueeze(0).to(dev)
     hidden_layer_neurons = (task_id - 99) * 100
 
     classifier = Classifier(hidden_layer_neurons).to(dev)

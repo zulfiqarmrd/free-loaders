@@ -2,6 +2,7 @@ import argparse
 import json
 import random
 import time
+import numpy as np
 
 import requests
 
@@ -62,7 +63,10 @@ def offload_one(address, device_id, task_id):
 
     elif task_id < 150:
         # Image classification task.
-        pass
+        dummy_image = np.random.rand(3*32*32).tolist()
+        payload['input_data'] = {
+            'image': dummy_image
+        }
 
     # Send the task to the controller.
     url = 'http://{}:{}/submit-task'.format(address, ControllerHTTPPort)
