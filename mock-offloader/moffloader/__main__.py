@@ -37,7 +37,7 @@ def offload_one(address, device_id, task_id):
 
     if task_id < 50:
         # For loop task.
-        # Nothing else to do.
+        payload['input_data'] = 0
         pass
     elif task_id < 100:
         # Matrix multiplication task.
@@ -55,10 +55,10 @@ def offload_one(address, device_id, task_id):
             a.append(ax)
             b.append(bx)
 
-        payload['input_data'] = json.dumps({
-            'a': '{}'.format(a),
-            'b': '{}'.format(b),
-        })
+        payload['input_data'] = {
+            'a': a,
+            'b': b,
+        }
 
     elif task_id < 150:
         # Image classification task.
