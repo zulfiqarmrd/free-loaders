@@ -9,9 +9,10 @@ paho-mqtt = "~=1.6"
 psutil = "~=5.9"
 jetson-stats = { version = "~=3.1", markers = "'tegra' in platform_release" }
 numpy = "*"
+requests = "~=2.28"
 torch = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.7"
+python_version = "3"
