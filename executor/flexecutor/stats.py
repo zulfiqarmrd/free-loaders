@@ -119,7 +119,6 @@ def __gpu_load_entry():
                         __GPULoad = current_gpu_usage
                     else:
                         __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_gpu_usage * (1.0 / __GPULoadHistory))
-                    log.d('gpu-load: {}'.format(__GPULoad))
                     __GPULoadLock.release()
                 else:
                     log.e('unable to collect GPU load data')
