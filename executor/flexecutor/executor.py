@@ -8,7 +8,7 @@ import paho.mqtt.client
 import stats
 from tasker.loop import run_loop_task
 from tasker.mm import run_mm_task
-from tasker.img_classification import run_img_classification_task
+from tasker.cnn_img_classification import run_img_classification_task
 
 # MQTT server port; fixed to 1883.
 MQTTServerPort = 1883

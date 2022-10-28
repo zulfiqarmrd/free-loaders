@@ -63,9 +63,8 @@ def offload_one(address, device_id, task_id):
 
     elif task_id < 150:
         # Image classification task.
-        dummy_image = np.random.rand(3*32*32).tolist()
+        # the image classification batch size is dependent on the task_id, we don't send any input data
         payload['input_data'] = {
-            'image': dummy_image
         }
 
     # Send the task to the controller.
