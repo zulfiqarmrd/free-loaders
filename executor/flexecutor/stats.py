@@ -37,6 +37,7 @@ def fetch():
     gpu_stats = _gpu_stats()
 
     state = {
+        'cpu-count': os.cpu_count(),
         'cpu-load': psutil.getloadavg()[0],
         'free-ram': mem.available,
         'total-ram': mem.total,
