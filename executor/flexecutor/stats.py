@@ -108,8 +108,8 @@ def __gpu_load_entry():
     if os.uname().release.endswith('-tegra'):
         # Collect load information.
         import jtop
-        with jtop.jtop() as jetson_ctx:
-            while True:
+        while True:
+            with jtop.jtop() as jetson_ctx:
                 if jetson_ctx.ok():
                     current_gpu_usage = jetson_ctx.stats['GPU']
                     if __GPUUsagesCollected < __GPULoadHistory:

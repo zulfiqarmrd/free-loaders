@@ -20,4 +20,4 @@ if __name__ == '__main__':
     a = np.random.rand(1000,1000)
     b = np.random.rand(1000,1000)
     # code to generate matrix input in json format:
-    print(run_mm_task({"a": a, "b": b}))
+    run_mm_task({"a": a, "b": b})
