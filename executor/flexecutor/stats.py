@@ -135,6 +135,12 @@ def __gpu_load_entry():
         import jtop
         while True:
             jetson_ctx = jtop.jtop()
+
+            # Check to see if the thread is running,
+            # and start it if it is not.
+            if not jetson_ctx.is_alive():
+                jetson_ctx.start()
+
             if jetson_ctx.ok():
                 current_gpu_usage = jetson_ctx.stats['GPU']
                 if __GPUUsagesCollected < __GPULoadHistory:
