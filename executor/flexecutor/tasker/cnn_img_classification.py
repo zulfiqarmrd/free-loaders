@@ -1,3 +1,4 @@
+import sys
 import time
 import torch
 # Implementation of CNN/ConvNet Model using PyTorch
@@ -102,5 +103,8 @@ def run_img_classification_task(task_id, input_data):
     return output_class_weights.tolist()[:output_size]
 
 if __name__ == '__main__':
-    # print(profile_img_classification_task())
-    print(run_img_classification_task(100, {}))
+    if len(sys.argv) != 3:
+        print("needs task_id, input as arg")
+        sys.exit(1)
+
+    run_img_classification_task(int(sys.argv[1]), sys.argv[2])
