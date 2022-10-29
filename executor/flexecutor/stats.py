@@ -54,13 +54,22 @@ def fetch():
 def _process_thread_count():
     pids = psutil.pids()
     process_count = len(pids)
-    thread_count = functools.reduce(lambda acc, c: acc + c,
-                          map(lambda p: p.num_threads(),
-                              psutil.process_iter()),
-                          0)
+    thread_count = 0
+    # Place process and thread count acquisition in a loop.
+    # System state changes may keep psutil from getting information without error.
+    while True:
+        try:
+            thread_count = functools.reduce(
+                lambda acc, c: acc + c,
+                map(lambda p: p.num_threads(),
+                    psutil.process_iter()),
+                0)
+            break
+        except (psutil.NoSuchProcess, FileNotFoundError):
+            log.d('psutil failed to get process, thread count; retrying')
+            time.sleep(.05)
 
     return (process_count, thread_count)
-
 
 def _gpu_stats():
     '''Fetch GPU usage information, if available.
@@ -109,11 +118,11 @@ def __gpu_load_entry():
         # Collect load information.
         import jtop
         while True:
-            with jtop.jtop() as jetson_ctx:
-                if jetson_ctx.ok():
-                    current_gpu_usage = jetson_ctx.stats['GPU']
-                    if __GPUUsagesCollected < __GPULoadHistory:
-                        __GPUUsagesCollected = __GPUUsagesCollected + 1
+            jetson_ctx = jtop.jtop()
+            if jetson_ctx.ok():
+                current_gpu_usage = jetson_ctx.stats['GPU']
+                if __GPUUsagesCollected < __GPULoadHistory:
+                    __GPUUsagesCollected = __GPUUsagesCollected + 1
 
                     __GPULoadLock.acquire()
                     if __GPUUsagesCollected == 1:
@@ -124,6 +133,9 @@ def __gpu_load_entry():
                 else:
                     log.e('unable to collect GPU load data')
                     time.sleep(3)
+            jetson_ctx.close()
+
+            # Wait before collecting more GPU load data.
             time.sleep(__GPULoadCollectInterval)
     else:
         log.i('GPU monitor exiting because nothing to monitor')
