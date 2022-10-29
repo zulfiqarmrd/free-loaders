@@ -167,18 +167,20 @@ def __gpu_load_entry():
             else:
                 current_load = int(m['utilization']) / 100
                 # log.d('current GPU load: {}'.format(current_load))
-                if __GPUUsagesCollected < __GPULoadHistory:
+                if __GPUUsagesCollected < __GPULoadHistory / 4:
                     __GPUUsagesCollected = __GPUUsagesCollected + 1
 
-                    __GPULoadLock.acquire()
-                    if __GPUUsagesCollected == 1:
-                        __GPULoad = current_load
-                    else:
-                        __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_load * (1.0 / __GPULoadHistory))
-                        __GPULoad = round(__GPULoad, 4)
+                __GPULoadLock.acquire()
+                if __GPUUsagesCollected == 1:
+                    __GPULoad = current_load
+                else:
+                    __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_load * (1.0 / __GPULoadHistory))
+                    if __GPULoad < 0.0001:
+                        __GPULoad = 0.0
+                    # log.d('updated GPU load')
 
-                    # log.d('load: {}'.format(__GPULoad))
-                    __GPULoadLock.release()
+                # log.d('load: {}'.format(__GPULoad))
+                __GPULoadLock.release()
             time.sleep(__GPULoadCollectInterval * 4)
     else:
         log.i('GPU monitor exiting because nothing to monitor')
@@ -189,8 +191,6 @@ def _get_gpu_load():
     '''
 
     global __GPULoad
-    global __GPULoadHistory
-    global __GPUUsagesCollected
     global __GPULoadLock
     __GPULoadLock.acquire()
     l = __GPULoad
