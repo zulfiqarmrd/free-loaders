@@ -1,6 +1,8 @@
 import functools
 import multiprocessing
 import os
+import re
+import subprocess
 import threading
 import time
 
@@ -71,6 +73,9 @@ def _process_thread_count():
 
     return (process_count, thread_count)
 
+# Path to the NVIDIA SMI binary.
+__NVIDIASMIPath = '/usr/bin/nvidia-smi'
+
 def _gpu_stats():
     '''Fetch GPU usage information, if available.
 
@@ -94,6 +99,17 @@ def _gpu_stats():
                 # Note: SoC shares RAM between CPU and GPU.
                 stats['free-vram'] = jetson_ctx.stats['RAM']
                 stats['total-vram'] = psutil.virtual_memory().total
+    elif os.path.exists(__NVIDIASMIPath):
+        cp = subprocess.run([__NVIDIASMIPath], capture_output=True)
+        m = re.search('(?P<free>[0-9]+)MiB */ * (?P<total>[0-9]+)MiB',
+                      cp.stdout.decode('utf-8'),
+                      re.MULTILINE)
+
+        if m != None:
+            stats['has-gpu'] = 1
+            stats['load'] = _get_gpu_load()
+            stats['total-vram'] = int(m['total']) * 1024 * 1024
+            stats['free-vram'] = stats['total-vram'] - (int(m['free']) * 1024 * 1024)
 
     return stats
 
@@ -124,19 +140,46 @@ def __gpu_load_entry():
                 if __GPUUsagesCollected < __GPULoadHistory:
                     __GPUUsagesCollected = __GPUUsagesCollected + 1
 
-                    __GPULoadLock.acquire()
-                    if __GPUUsagesCollected == 1:
-                        __GPULoad = current_gpu_usage
-                    else:
-                        __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_gpu_usage * (1.0 / __GPULoadHistory))
-                    __GPULoadLock.release()
+                __GPULoadLock.acquire()
+                if __GPUUsagesCollected == 1:
+                    __GPULoad = current_gpu_usage
                 else:
-                    log.e('unable to collect GPU load data')
-                    time.sleep(3)
+                    __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_gpu_usage * (1.0 / __GPULoadHistory))
+                __GPULoadLock.release()
+            else:
+                log.e('unable to collect GPU load data')
+                time.sleep(3)
             jetson_ctx.close()
 
             # Wait before collecting more GPU load data.
             time.sleep(__GPULoadCollectInterval)
+    elif os.path.exists(__NVIDIASMIPath):
+        # Use NVIDIA SMI utility to get GPU information.
+        log.i('Using nvidia-smi to get GPU information')
+        nvidia_smi_args = [__NVIDIASMIPath, '-q', '-d', 'UTILIZATION']
+
+        while True:
+            cp = subprocess.run(nvidia_smi_args, capture_output=True)
+            m = re.search('Gpu *: *(?P<utilization>[0-9][0-9]*) %', cp.stdout.decode('utf-8'), re.MULTILINE)
+            if m == None:
+                log.e('could not parse nvidia-smi output')
+                # print(cp.stdout.decode('utf-8'))
+            else:
+                current_load = int(m['utilization']) / 100
+                # log.d('current GPU load: {}'.format(current_load))
+                if __GPUUsagesCollected < __GPULoadHistory:
+                    __GPUUsagesCollected = __GPUUsagesCollected + 1
+
+                    __GPULoadLock.acquire()
+                    if __GPUUsagesCollected == 1:
+                        __GPULoad = current_load
+                    else:
+                        __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_load * (1.0 / __GPULoadHistory))
+                        __GPULoad = round(__GPULoad, 4)
+
+                    # log.d('load: {}'.format(__GPULoad))
+                    __GPULoadLock.release()
+            time.sleep(__GPULoadCollectInterval * 4)
     else:
         log.i('GPU monitor exiting because nothing to monitor')
         return
