@@ -120,6 +120,7 @@ def __executor_task_entry(mqtt_client, task_request):
         log.d('sending response to controller')
         mqtt_client.publish(MQTTTopicTaskResponse,
                             result.encode('utf-8'))
+    p_recv.close()
 
 
 def __process_task_entry(pipe, task_request):
@@ -156,3 +157,4 @@ def __process_task_entry(pipe, task_request):
     # mqtt_client.publish(MQTTTopicTaskResponse,
     #                     json.dumps(response).encode('utf-8'))
     pipe.send(json.dumps(response))
+    pipe.close()
