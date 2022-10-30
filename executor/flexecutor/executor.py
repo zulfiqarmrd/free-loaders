@@ -99,6 +99,7 @@ def __executor_task_entry(mqtt_client, task_request):
     process = Process(target=__process_task_entry, args=(p_send, task_request))
     process.start()
 
+    p_send.close()
     # wait for process to finish execution
     process.join()
     if process.exitcode == 1:
@@ -116,7 +117,7 @@ def __executor_task_entry(mqtt_client, task_request):
                             json.dumps(response).encode('utf-8'))
     else:
         result = p_recv.recv()
-        log.d('got output data pipe: {}'.format(result))
+        log.d('got output data via pipe: {}'.format(result))
         log.d('sending response to controller')
         mqtt_client.publish(MQTTTopicTaskResponse,
                             result.encode('utf-8'))
