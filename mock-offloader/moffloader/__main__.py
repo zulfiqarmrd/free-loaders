@@ -8,12 +8,18 @@ import requests
 
 ControllerHTTPPort = 8001
 
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
 def main(args):
     if args.task_id == None:
         offload_many(args.address,
-                    args.device_id,
-                    args.task_count,
-                    args.rate)
+                     args.device_id,
+                     args.task_count,
+                     args.rate)
     else:
         offload_one(args.address,
                     args.device_id,
@@ -58,7 +64,7 @@ def offload_one(address, device_id, task_id):
 
     # Send the task to the controller.
     url = 'http://{}:{}/submit-task'.format(address, ControllerHTTPPort)
-    body_json = json.dumps(payload)
+    body_json = json.dumps(payload, cls=NumpyEncoder)
     # print('Sending task data {}'.format(body_json))
     try:
         response = requests.post(url, data=body_json, headers={'Content-Type': 'application/json'})
