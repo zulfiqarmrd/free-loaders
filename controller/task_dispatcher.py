@@ -6,7 +6,6 @@ from aiohttp import ClientSession, ClientConnectorError
 import time
 
 executer_server_port = 8088
-execution_times = {}
 
 # mqtt topics
 controller_offloader_task_response_topic = "ctrl-offl-task-response"  # pub
@@ -45,16 +44,18 @@ class TaskDispatcher:
     def __init__(self, rl_scheduler, executers):
         self.rl_scheduler = rl_scheduler
         self.executers = executers
-        self.tasks = {}
-
         self.mqtt_client = mqtt.Client()
+        self.execution_times = {}  # offload_id -> start_time
+        self.deadlines = {}  # offload_id -> deadline
+        self.deadlines_met = 0
+        self.finished_tasks = 0
 
         # The callback for when the client receives a CONNACK response from the server.
         clientloop_thread = Thread(target=self.connect, args=(self.mqtt_client,))
         clientloop_thread.start()
 
     def on_connect(self, client, userdata, flags, rc):
-        print("[task_dispatcher] connected to mqtt with result code " + str(rc))
+        print("[td] connected to mqtt with result code " + str(rc))
 
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
@@ -78,12 +79,22 @@ class TaskDispatcher:
                 offload_id = message_json["offload_id"]
                 state_of_executor = message_json["state"]
                 executor_id = message_json["executor_id"]
-                print(f"[task_dispatch] response received for offload_id {offload_id} from executor {executor_id}")
-                print(f'state of executor = {state_of_executor}')
+                task_id = message_json["task_id"]
+
+                if offload_id not in self.execution_times.keys():
+                    # ignore a response if we're not expecting it
+                    print(f"[td] ignored response for task (offload_id={offload_id}, task_id={task_id}) from executer_id={executor_id}")
+                    return
 
                 # compute execution time
-                exec_time_ms = (time.time() - execution_times[offload_id]) * 1000
-                print(f'[task_dispatcher] time for offload_id {offload_id} on executor {executor_id} = {exec_time_ms}')
+                exec_time_ms = (time.time() - self.execution_times[offload_id]) * 1000
+                deadline = self.deadlines[offload_id]
+                deadline_met = exec_time_ms <= deadline
+                print(f"[td] finished task (offload_id={offload_id}, task_id={task_id}) on executer_id={executor_id}. time(ms)={exec_time_ms}, deadline={deadline}, deadline_met={deadline_met}")
+
+                self.finished_tasks += 1
+                self.deadlines_met += (1 if deadline_met else 0)
+                print(f"[td] deadlines_met={self.deadlines_met},finished_tasks={self.finished_tasks},dsr={self.deadlines_met/self.finished_tasks}")
 
                 # give the feedback to the rl scheduler
                 self.rl_scheduler.task_finished(offload_id, exec_time_ms, state_of_executor, str(executor_id))
@@ -91,10 +102,10 @@ class TaskDispatcher:
                 del message_json["state"] # exclude state from being sent to the offloader
                 # publish this to the offloader
                 client.publish(controller_offloader_task_response_topic, json.dumps(message_json).encode('utf-8'))
-                print(f"[task_dispatch] response for offload_id {offload_id} forwarded to offloader")
 
-                # remove the offload_id's execution time epoch's from memory
-                del execution_times[offload_id]
+                # remove the offload_id's execution time and deadline from memory
+                del self.execution_times[offload_id]
+                del self.deadlines[offload_id]
 
     def on_disconnect(self, client, userdata, rc=0):
         print("DisConnected result code " + str(rc))
@@ -121,7 +132,6 @@ class TaskDispatcher:
             "input_data": task.input_data
         }
         self.mqtt_client.publish(controller_executer_task_execute_topic, json.dumps(task_request_msg).encode('utf-8'))
-        print(f"task sent for execution to executer {self.executers[executer_id].executer_ip}")
 
     def get_executer_state(self):
         # create a list of all executer ips with a specific http endpoint
@@ -130,22 +140,20 @@ class TaskDispatcher:
         return dict(asyncio.run(make_requests(url_tuples=url_tuples)))
 
     def submit_task(self, task):
-        print(f"[task_dispatcher] received task: {task.task_id}")
+        print(f"[td] new task(offload_id={task.offload_id}, task_id={task.task_id}, deadline={task.deadline})")
 
-        execution_times[task.offload_id] = time.time()
+        self.execution_times[task.offload_id] = time.time()
+        self.deadlines[task.offload_id] = task.deadline
 
         # query all executers for their state
         state_of_executors = self.get_executer_state()
 
-        print(f'[task_dispatcher] before_state = {state_of_executors}')
+        #print(f'[td] before_state = {state_of_executors}')
 
         # test code
         # executer_id = 0
         # request rl scheduler to schedule this task
         executer_id = self.rl_scheduler.schedule(state_of_executors, task)
 
-        print(f"[task_dispatcher] task needs to be sent to executer {executer_id}")
+        print(f"[td] scheduled task(offload_id={task.offload_id}, task_id={task.task_id}) on executer_id={executer_id}")
         self.send_task_to_executer(executer_id, task)
-
-        # save the task for future reference
-        self.tasks[task.offload_id] = task
