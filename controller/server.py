@@ -7,7 +7,7 @@ import cgi
 
 next_offload_id = 0
 PORT = 8001
-DEFAULT_DEADLINE = 5000 # 5 seconds
+DEFAULT_DEADLINE = 15000 # 15 seconds
 
 
 class MyHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -21,6 +21,9 @@ class MyHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
+
+    def log_message(self, format, *args):
+        pass
 
     def do_POST(self):
         if self.path == '/submit-task':
