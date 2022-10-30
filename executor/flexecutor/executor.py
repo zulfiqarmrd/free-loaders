@@ -10,7 +10,7 @@ from tasker.loop import run_loop_task
 from tasker.mm import run_mm_task
 from tasker.cnn_img_classification import run_img_classification_task
 
-from multiprocessing import Process
+from multiprocessing import Process, Pipe
 
 # MQTT server port; fixed to 1883.
 MQTTServerPort = 1883
@@ -95,7 +95,8 @@ def __execute_task(client, task_request):
     return thread
 
 def __executor_task_entry(mqtt_client, task_request):
-    process = Process(target=__process_task_entry, args=(mqtt_client, task_request))
+    (p_recv, p_send) = Pipe([False])
+    process = Process(target=__process_task_entry, args=(p_send, task_request))
     process.start()
 
     # wait for process to finish execution
@@ -113,9 +114,15 @@ def __executor_task_entry(mqtt_client, task_request):
         }
         mqtt_client.publish(MQTTTopicTaskResponse,
                             json.dumps(response).encode('utf-8'))
+    else:
+        result = p_recv.recv()
+        log.d('got output data pipe: {}'.format(result))
+        log.d('sending response to controller')
+        mqtt_client.publish(MQTTTopicTaskResponse,
+                            result.encode('utf-8'))
 
 
-def __process_task_entry(mqtt_client, task_request):
+def __process_task_entry(pipe, task_request):
     '''Task execution process entry.
 
     Executes the task and sends the result and state to the controller.
@@ -146,5 +153,6 @@ def __process_task_entry(mqtt_client, task_request):
         'state': current_state,
         'status': 0
     }
-    mqtt_client.publish(MQTTTopicTaskResponse,
-                        json.dumps(response).encode('utf-8'))
+    # mqtt_client.publish(MQTTTopicTaskResponse,
+    #                     json.dumps(response).encode('utf-8'))
+    pipe.send(json.dumps(response))
