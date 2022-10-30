@@ -41,24 +41,23 @@ class RLScheduler:
 
         self.total_executor = len(executers.keys())
 
-        #ToDo, update input size
-        self.Q = Q_Network(input_size=102, hidden_size=400, output_size=self.total_executor)
+        self.Q = Q_Network(input_size=133, hidden_size=400, output_size=self.total_executor)
 
         self.Q_ast = copy.deepcopy(self.Q)
         self.optimizer = chainer.optimizers.Adam()
         self.optimizer.setup(self.Q)
 
         self.epoch_num = 20
-        self.memory_size = 800
-        self.batch_size = 20
-        self.epsilon = 1.0
+        self.memory_size = 200  # TODO change back to 800
+        self.batch_size = 15
+        self.epsilon = 0.5
         self.epsilon_decrease = 1e-3
         self.epsilon_min = 0.1
-        self.start_reduce_epsilon = 200
+        self.start_reduce_epsilon = 200  # TODO change back to 200
         self.train_freq = 10
         self.update_q_freq = 20
         self.gamma = 0.97
-        self.show_log_freq = 5
+        self.show_log_freq = 1
 
         self.memory = []
         self.total_step = 0
@@ -69,40 +68,42 @@ class RLScheduler:
 
     def save_state(self, task, state, act):
 
-        self.state_table[task.offload_id] = [state, act, task.deadline]
+        self.state_table[task.offload_id] = [task, state, act, task.deadline]
 
     def get_saved_state(self, offload_id):
 
-        state, act, deadline = self.state_table[offload_id]
+        task, state, act, deadline = self.state_table[offload_id]
         del self.state_table[offload_id]
 
-        return state, act, deadline
+        return task, state, act, deadline
 
     def process_state(self, before_state, task):
 
         state = []
+        task_id_vec = [int(x) for x in list('{:032b}'.format(int(task.task_id)))]
 
-        task_id_vec = [ord(c) for c in str(task.task_id)]
-
-        state.append(task_id_vec)
+        state.extend(task_id_vec)
         state.append(task.deadline)
 
         for key in before_state:
-            key_vec = [ord(c) for c in key]
-            state.append(key_vec)
 
             state.extend(list(before_state[key].values()))
+
+            x = list(before_state[key].values())
 
         return state
 
     def generate_new_state(self, before_state, new_state_of_executor, exec_id):
 
         new_state = before_state
+
         new_state[exec_id] = new_state_of_executor
 
         return new_state
 
     def generate_reward(self, deadline, exec_time):
+
+        # print("----------------\n Time: ", deadline, exec_time)
 
         if exec_time > deadline:
             reward = -np.tanh(exec_time/deadline)
@@ -124,9 +125,13 @@ class RLScheduler:
 
         # select act
         pact = np.random.randint(self.total_executor)
+
+
         if np.random.rand() > self.epsilon:
+
             pact = self.Q(np.array(pobs, dtype=np.float32).reshape(1, -1))
-            pact = np.argmax(pact.data)
+            pact = np.argmax(pact.data).item()
+
 
         self.save_state(task, before_state, pact)
 
@@ -135,9 +140,12 @@ class RLScheduler:
 
     def task_finished(self, offload_id, exec_time, new_state_of_executor, exec_id):
 
-        pobs, pact, deadline = self.get_saved_state(offload_id)
+        task, before_state, pact, deadline = self.get_saved_state(offload_id)
+        new_state = self.generate_new_state(before_state, new_state_of_executor, exec_id)
 
-        obs = self.generate_new_state(pobs, new_state_of_executor, exec_id)
+        pobs = self.process_state(before_state, task)
+        obs =  self.process_state(new_state, task)
+
         reward = self.generate_reward(deadline, exec_time)
         done = self.done_with_learning(reward)
 
@@ -149,58 +157,62 @@ class RLScheduler:
         # train or update q
         if len(self.memory) == self.memory_size:
 
-            f = open('result/reward_loss.csv', 'a', newline='')
+            # f = open('result/reward_loss.csv', 'a', newline='')
+            with open('reward_loss.csv', 'w', newline='') as f:
+                total_reward = 0
+                total_loss = 0
 
-            total_reward = 0
-            total_loss = 0
+                for epoch in range(self.epoch_num):
 
-            for epoch in range(self.epoch_num):
+                    if self.total_step % self.train_freq == 0:
+                        shuffled_memory = np.random.permutation(self.memory)
+                        memory_idx = range(len(shuffled_memory))
+                        for i in memory_idx[::self.batch_size]:
+                            batch = np.array(shuffled_memory[i:i + self.batch_size])
 
-                if self.total_step % self.train_freq == 0:
-                    shuffled_memory = np.random.permutation(self.memory)
-                    memory_idx = range(len(shuffled_memory))
-                    for i in memory_idx[::self.batch_size]:
-                        batch = np.array(shuffled_memory[i:i + self.batch_size])
+                            #b_pobs = np.array(batch[:, 0].tolist(), dtype=np.float32).reshape(self.batch_size, -1)
+                            b_pobs = np.array(batch[:, 0].tolist(), dtype=np.float32)
+                            b_pact = np.array(batch[:, 1].tolist(), dtype=np.int32)
+                            b_reward = np.array(batch[:, 2].tolist(), dtype=np.int32)
+                            #b_obs = np.array(batch[:, 3].tolist(), dtype=np.float32).reshape(self.batch_size, -1)
+                            b_obs = np.array(batch[:, 3].tolist(), dtype=np.float32)
+                            b_done = np.array(batch[:, 4].tolist(), dtype=np.bool)
 
-                        b_pobs = np.array(batch[:, 0].tolist(), dtype=np.float32).reshape(self.batch_size, -1)
-                        b_pact = np.array(batch[:, 1].tolist(), dtype=np.int32)
+                            q = self.Q(b_pobs)
 
-                        b_reward = np.array(batch[:, 2].tolist(), dtype=np.int32)
-                        b_obs = np.array(batch[:, 3].tolist(), dtype=np.float32).reshape(self.batch_size, -1)
-                        b_done = np.array(batch[:, 4].tolist(), dtype=np.bool)
-                        q = self.Q(b_pobs)
-                        maxq = np.max(self.Q_ast(b_obs).data, axis=1)
-                        target = copy.deepcopy(q.data)
-                        for j in range(self.batch_size):
-                            target[j, b_pact[j]] = b_reward[j] + self.gamma * maxq[j] * (not b_done[j])
-                        self.Q.reset()
-                        loss = F.mean_squared_error(q, target)
-                        total_loss += loss.data
-                        loss.backward()
-                        self.optimizer.update()
+                            maxq = np.max(self.Q_ast(b_obs).data, axis=1)
+                            target = copy.deepcopy(q.data)
 
-                if self.total_step % self.update_q_freq == 0:
-                    self.Q_ast = copy.deepcopy(self.Q)
+                            for j in range(target.shape[0]):
 
-                # epsilon
-                if self.epsilon > self.epsilon_min and self.total_step > self.start_reduce_epsilon:
-                    self.epsilon -= self.epsilon_decrease
+                                target[j, b_pact[j]] = b_reward[j] + self.gamma * maxq[j] * (not b_done[j])
+                            self.Q.reset()
+                            loss = F.mean_squared_error(q, target)
+                            total_loss += loss.data
+                            loss.backward()
+                            self.optimizer.update()
 
-                # next step
-                total_reward += reward
-                self.total_step += 1
+                    if self.total_step % self.update_q_freq == 0:
+                        self.Q_ast = copy.deepcopy(self.Q)
 
-            self.total_rewards.append(total_reward)
-            self.total_losses.append(total_loss)
+                    # epsilon
+                    if self.epsilon > self.epsilon_min and self.total_step > self.start_reduce_epsilon:
+                        self.epsilon -= self.epsilon_decrease
 
-            if (epoch + 1) % self.show_log_freq == 0:
+                    # next step
+                    total_reward += reward
+                    self.total_step += 1
+
+                self.total_rewards.append(total_reward)
+                self.total_losses.append(total_loss)
+
                 log_reward = sum(self.total_rewards[((epoch + 1) - self.show_log_freq):]) / self.show_log_freq
                 log_loss = sum(self.total_losses[((epoch + 1) - self.show_log_freq):]) / self.show_log_freq
-                print('\t'.join(map(str, [epoch + 1, self.epsilon, self.total_step, log_reward, log_loss])))
+                # print('\t'.join(map(str, [epoch + 1, self.epsilon, self.total_step, log_reward, log_loss])))
 
-            # save Q, total_losses, total_rewards
-            writer = csv.writer(f)
-            writer.writerow([str(total_reward), str(total_loss)])
-            f.close()
+                # save Q, total_losses, total_rewards
+                writer = csv.writer(f)
+                writer.writerow([str(total_reward)])
+                # f.close()
 
-            serializers.save_npz('SavedModels/Q.model', self.Q)
+            serializers.save_npz('Q.model', self.Q)
