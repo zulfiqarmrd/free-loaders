@@ -2,7 +2,7 @@ from threading import Thread
 import paho.mqtt.client as mqtt
 import json
 import asyncio
-from aiohttp import ClientSession, ClientConnectorError
+from aiohttp import ClientSession
 import time
 
 executer_server_port = 8088
@@ -80,17 +80,25 @@ class TaskDispatcher:
                 state_of_executor = message_json["state"]
                 executor_id = message_json["executor_id"]
                 task_id = message_json["task_id"]
+                status = message_json["status"]
 
                 if offload_id not in self.execution_times.keys():
                     # ignore a response if we're not expecting it
                     print(f"[td] ignored response for task (offload_id={offload_id}, task_id={task_id}) from executer_id={executor_id}")
                     return
 
-                # compute execution time
-                exec_time_ms = (time.time() - self.execution_times[offload_id]) * 1000
                 deadline = self.deadlines[offload_id]
+                if status != 0:
+                    # execution failed to finish - set exec_time to 2*deadline
+                    # TODO future work: explicitly inform rl scheduler that the executer had a failure!
+                    exec_time_ms = 2 * deadline
+                    print(f"[td] task(offload_id={offload_id}, task_id={task_id}) failed on executer_id={executor_id}, status={status}")
+                else:
+                    # compute execution time
+                    exec_time_ms = (time.time() - self.execution_times[offload_id]) * 1000
+
                 deadline_met = exec_time_ms <= deadline
-                print(f"[td] finished task (offload_id={offload_id}, task_id={task_id}) on executer_id={executor_id}. time(ms)={exec_time_ms}, deadline={deadline}, deadline_met={deadline_met}")
+                print(f"[td] finished task(offload_id={offload_id}, task_id={task_id}) on executer_id={executor_id}. time(ms)={exec_time_ms}, deadline={deadline}, deadline_met={deadline_met}")
 
                 self.finished_tasks += 1
                 self.deadlines_met += (1 if deadline_met else 0)

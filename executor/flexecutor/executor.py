@@ -10,6 +10,8 @@ from tasker.loop import run_loop_task
 from tasker.mm import run_mm_task
 from tasker.cnn_img_classification import run_img_classification_task
 
+from multiprocessing import Process
+
 # MQTT server port; fixed to 1883.
 MQTTServerPort = 1883
 
@@ -93,7 +95,28 @@ def __execute_task(client, task_request):
     return thread
 
 def __executor_task_entry(mqtt_client, task_request):
-    '''Task execution thread entry.
+    process = Process(target=__process_task_entry, args=(mqtt_client, task_request))
+    process.start()
+
+    # wait for process to finish execution
+    process.join()
+    if process.exitcode == 1:
+        log.e(f'process failed with exit code = {process.exitcode}')
+        # Collect current state and send it, along with the result.
+        current_state = stats.fetch()
+        response = {
+            'executor_id': task_request['executer_id'],
+            'task_id': task_request['task_id'],
+            'offload_id': task_request['offload_id'],
+            'state': current_state,
+            'status': process.exitcode  # inform the controller that we failed
+        }
+        mqtt_client.publish(MQTTTopicTaskResponse,
+                            json.dumps(response).encode('utf-8'))
+
+
+def __process_task_entry(mqtt_client, task_request):
+    '''Task execution process entry.
 
     Executes the task and sends the result and state to the controller.
     '''
@@ -121,6 +144,7 @@ def __executor_task_entry(mqtt_client, task_request):
         'offload_id': task_request['offload_id'],
         'result': res,
         'state': current_state,
+        'status': 0
     }
     mqtt_client.publish(MQTTTopicTaskResponse,
                         json.dumps(response).encode('utf-8'))
