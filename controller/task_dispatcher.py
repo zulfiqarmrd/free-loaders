@@ -49,6 +49,7 @@ class TaskDispatcher:
         self.deadlines = {}  # offload_id -> deadline
         self.deadlines_met = 0
         self.finished_tasks = 0
+        self.failed_tasks = 0
 
         # The callback for when the client receives a CONNACK response from the server.
         clientloop_thread = Thread(target=self.connect, args=(self.mqtt_client,))
@@ -92,17 +93,18 @@ class TaskDispatcher:
                     # execution failed to finish - set exec_time to 2*deadline
                     # TODO future work: explicitly inform rl scheduler that the executer had a failure!
                     exec_time_ms = 2 * deadline
-                    print(f"[td] task(offload_id={offload_id}, task_id={task_id}) failed on executer_id={executor_id}, status={status}")
+                    print(f"[td] failed task(offload_id={offload_id}, task_id={task_id}) on executer_id={executor_id}, status={status}. time(ms)={exec_time_ms}, deadline={deadline}, deadline_met={False}")
+                    self.failed_tasks += 1
                 else:
                     # compute execution time
                     exec_time_ms = (time.time() - self.execution_times[offload_id]) * 1000
+                    print(f"[td] finished task(offload_id={offload_id}, task_id={task_id}) on executer_id={executor_id}. time(ms)={exec_time_ms}, deadline={deadline}, deadline_met={exec_time_ms <= deadline}")
+                    self.finished_tasks += 1
 
                 deadline_met = exec_time_ms <= deadline
-                print(f"[td] finished task(offload_id={offload_id}, task_id={task_id}) on executer_id={executor_id}. time(ms)={exec_time_ms}, deadline={deadline}, deadline_met={deadline_met}")
-
-                self.finished_tasks += 1
                 self.deadlines_met += (1 if deadline_met else 0)
-                print(f"[td] deadlines_met={self.deadlines_met},finished_tasks={self.finished_tasks},dsr={self.deadlines_met/self.finished_tasks}")
+                dsr = self.deadlines_met/(self.finished_tasks+self.failed_tasks)
+                print(f"[td] deadlines_met={self.deadlines_met}, finished_tasks={self.finished_tasks}, failed_tasks={self.failed_tasks}, dsr={dsr}")
 
                 # give the feedback to the rl scheduler
                 self.rl_scheduler.task_finished(offload_id, exec_time_ms, state_of_executor, str(executor_id))
