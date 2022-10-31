@@ -88,8 +88,8 @@ def __execute_task(client, task_request):
     '''
 
     thread = threading.Thread(target=__executor_task_entry,
-                     # Hm. Is the MQTT client thread-safe?
-                     args=(client, task_request))
+                              # Hm. Is the MQTT client thread-safe?
+                              args=(client, task_request))
     thread.start()
 
     return thread
@@ -100,9 +100,13 @@ def __executor_task_entry(mqtt_client, task_request):
     process.start()
 
     p_send.close()
-    # wait for process to finish execution
-    process.join()
-    if process.exitcode == 1:
+
+    try:
+        result = p_recv.recv()  # block and waits for data from the process
+        process.join()  # wait for process to finish up
+        mqtt_client.publish(MQTTTopicTaskResponse,
+                            result.encode('utf-8'))
+    except EOFError:
         log.e(f'process failed with exit code = {process.exitcode}')
         # Collect current state and send it, along with the result.
         current_state = stats.fetch()
@@ -115,13 +119,9 @@ def __executor_task_entry(mqtt_client, task_request):
         }
         mqtt_client.publish(MQTTTopicTaskResponse,
                             json.dumps(response).encode('utf-8'))
-    else:
-        result = p_recv.recv()
-        log.d('got output data via pipe: {}'.format(result))
-        log.d('sending response to controller')
-        mqtt_client.publish(MQTTTopicTaskResponse,
-                            result.encode('utf-8'))
-    p_recv.close()
+    finally:
+        p_recv.close()
+
 
 
 def __process_task_entry(pipe, task_request):
@@ -155,7 +155,5 @@ def __process_task_entry(pipe, task_request):
         'state': current_state,
         'status': 0
     }
-    # mqtt_client.publish(MQTTTopicTaskResponse,
-    #                     json.dumps(response).encode('utf-8'))
     pipe.send(json.dumps(response))
     pipe.close()
