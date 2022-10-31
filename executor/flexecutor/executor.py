@@ -121,6 +121,7 @@ def __executor_task_entry(mqtt_client, task_request):
                             json.dumps(response).encode('utf-8'))
     finally:
         p_recv.close()
+        process.terminate()
 
 
 
