@@ -50,6 +50,7 @@ class TaskDispatcher:
         self.deadlines_met = 0
         self.finished_tasks = 0
         self.failed_tasks = 0
+        self.total_tasks = 0
 
         # The callback for when the client receives a CONNACK response from the server.
         clientloop_thread = Thread(target=self.connect, args=(self.mqtt_client,))
@@ -104,7 +105,7 @@ class TaskDispatcher:
                 deadline_met = exec_time_ms <= deadline
                 self.deadlines_met += (1 if deadline_met else 0)
                 dsr = self.deadlines_met/(self.finished_tasks+self.failed_tasks)
-                print(f"[td] deadlines_met={self.deadlines_met}, finished_tasks={self.finished_tasks}, failed_tasks={self.failed_tasks}, dsr={dsr}")
+                print(f"[td] deadlines_met={self.deadlines_met}, finished_tasks={self.finished_tasks}, failed_tasks={self.failed_tasks}, pending_tasks={self.total_tasks-(self.finished_tasks+self.failed_tasks)}, dsr={dsr}")
 
                 # give the feedback to the rl scheduler
                 self.rl_scheduler.task_finished(offload_id, exec_time_ms, state_of_executor, str(executor_id))
@@ -160,10 +161,10 @@ class TaskDispatcher:
 
         #print(f'[td] before_state = {state_of_executors}')
 
-        # test code
-        # executer_id = 0
         # request rl scheduler to schedule this task
         executer_id = self.rl_scheduler.schedule(state_of_executors, task)
 
         print(f"[td] scheduled task(offload_id={task.offload_id}, task_id={task.task_id}) on executer_id={executer_id}")
         self.send_task_to_executer(executer_id, task)
+
+        self.total_tasks += 1
