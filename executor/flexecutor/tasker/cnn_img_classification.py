@@ -100,7 +100,7 @@ def run_img_classification_task(task_id, input_data):
         torch.cuda.synchronize()
 
     # return a constant sized array
-    output_size = 1000
+    output_size = batch_size
     return output_class_weights.tolist()[:output_size]
 
 if __name__ == '__main__':
