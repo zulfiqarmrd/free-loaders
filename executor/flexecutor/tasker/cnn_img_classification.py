@@ -90,7 +90,8 @@ def run_img_classification_task(task_id, input_data):
     dev = torch.device("cuda") if using_cuda else torch.device("cpu")
     channels = 1
     image_dim = 28
-    batch_size = 122 * (task_id - 99) + 1378 # task_id: [100, 149], batch size: ~[1500, 7500]
+    # batch_size = 122 * (task_id - 99) + 1378 # task_id: [100, 149], batch size: ~[1500, 7500]
+    batch_size = (task_id - 99) * 30  # task_id: [100, 149], batch size: [30, 1500]
 
     images = torch.rand(batch_size, channels, image_dim, image_dim).to(dev)
     classifier = CNN().to(dev)

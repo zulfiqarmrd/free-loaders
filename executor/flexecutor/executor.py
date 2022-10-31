@@ -106,7 +106,7 @@ def __executor_task_entry(mqtt_client, task_request):
         process.join()  # wait for process to finish up
         mqtt_client.publish(MQTTTopicTaskResponse,
                             result.encode('utf-8'))
-    except EOFError:
+    except (EOFError, OSError):
         log.e(f'process failed with exit code = {process.exitcode}')
         # Collect current state and send it, along with the result.
         current_state = stats.fetch()
