@@ -103,7 +103,6 @@ def __executor_task_entry(mqtt_client, task_request):
 
     try:
         result = p_recv.recv()  # block and waits for data from the process
-        process.join()  # wait for process to finish up
         mqtt_client.publish(MQTTTopicTaskResponse,
                             result.encode('utf-8'))
     except (EOFError, OSError):
@@ -121,7 +120,9 @@ def __executor_task_entry(mqtt_client, task_request):
                             json.dumps(response).encode('utf-8'))
     finally:
         p_recv.close()
-        process.terminate()
+        process.join()  # wait for process to finish up
+        # process.terminate()
+        log.d("child process join done")
 
 
 
