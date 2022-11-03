@@ -1,7 +1,9 @@
 import json
 import log
+import multiprocessing
 import threading
 import time
+from multiprocessing import Process, Pipe
 
 import paho.mqtt.client
 
@@ -10,7 +12,6 @@ from tasker.loop import run_loop_task
 from tasker.mm import run_mm_task
 from tasker.cnn_img_classification import run_img_classification_task
 
-from multiprocessing import Process, Pipe
 
 # MQTT server port; fixed to 1883.
 MQTTServerPort = 1883
@@ -20,25 +21,31 @@ MQTTTopicExecuteTask = 'ctrl-exec-task-execute'
 # Topic the executor uses to send responses back to the controller.
 MQTTTopicTaskResponse = 'exec-ctrl-task-response'
 
-def start_executor(controller_addr, executor_id):
-    '''Launches the task executor thread.
+def start_executor(controller_addr, executor_id, log_level):
+    '''Launches the task executor process.
 
     Accepts the ID to use as its executor ID, which it uses to listen for work.
     '''
 
-    t = threading.Thread(name='executor',
-                         target=__executor_entry,
-                         args=(controller_addr, executor_id))
-    t.start()
+    p = Process(name='executor',
+                target=__executor_entry,
+                args=(controller_addr, executor_id, log_level))
+    p.start()
 
-    return t
+    return p
 
-def __executor_entry(controller_addr, executor_id):
+def __executor_entry(controller_addr, executor_id, log_level):
     '''Executor thread entry function.
 
     Listens for MQTT messages carrying tasks to run.
     Spins of new threads to perform work.
     '''
+
+    multiprocessing.current_process().name = 'EXECUTOR'
+    this_thread = threading.current_thread()
+    this_thread.name = 'executor'
+
+    log.set_level(log_level)
 
     log.i('started')
 

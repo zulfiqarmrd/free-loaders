@@ -39,7 +39,7 @@ def _log(level, msg):
     this_thread = threading.current_thread()
     thread_name = this_thread.name
     if this_thread.ident == threading.main_thread().ident:
-        thread_name = 'MAIN'
+        thread_name = 'MAIN-{}'.format(thread_name)
 
     if level <= __LogLevel:
         print('[{}][{}] - {}'.format(
