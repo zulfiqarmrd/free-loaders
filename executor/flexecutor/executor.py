@@ -105,6 +105,10 @@ def __executor_task_entry(mqtt_client, task_request):
     (p_recv, p_send) = Pipe([False])
     process = Process(target=__process_task_entry, args=(p_send, task_request))
     process.start()
+    log.i('started PID {} for task ID {}, offload ID {}'.format(
+        process.pid,
+        task_request['task_id'],
+        task_request['offload_id']))
 
     p_send.close()
 
