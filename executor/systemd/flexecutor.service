@@ -1,0 +1,15 @@
+[Unit]
+Description=Start the fReeLoaders executor service
+
+[Service]
+EnvironmentFile=/etc/default/flexecutor
+User=user
+WorkingDirectory=/home/user/free-loaders
+ExecStart=/usr/local/bin/pipenv run python executor/flexecutor -l d $CONTROLLER_IP $EXEC_ID
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=flexecutor
+
+[Install]
+WantedBy=multi-user.target
