@@ -17,14 +17,14 @@ __Children = {
 }
 
 def main(args):
-    __configure_signals()
-
     # Set the logging level as an environment variable.
     if config.LoggingEnvVar not in os.environ:
         os.environ[config.LoggingEnvVar] = args.log_level
 
     # Perform boring configuration.
     config.configure_process()
+
+    __configure_signals()
 
     threading.current_thread().name = 'top'
 
