@@ -2,6 +2,8 @@ import json
 import log
 import multiprocessing
 import os
+import signal
+import sys
 import threading
 import time
 from multiprocessing import Process, Pipe
@@ -44,6 +46,7 @@ def __executor_entry(controller_addr, executor_id, log_level):
     '''
 
     config.configure_process('executor')
+    signal.signal(signal.SIGALRM, __signal_handler)
 
     log.i('started')
 
@@ -53,16 +56,42 @@ def __executor_entry(controller_addr, executor_id, log_level):
     mqtt_client.on_disconnect = __mqtt_on_disconnect
 
     log.i('connecting to {}:{}'.format(controller_addr, MQTTServerPort))
+
+    # Attempt to connect to the MQTT server.
+    # This code has grown an issue since breaking it into a subprocess
+    # where the client does not want to connect, just forever hanging
+    # somewhere in the client code.
+    #
+    # We use SIGALRM to get out of this hang and kill the process when this happens.
+    # The top fLexecutor process will start the subprocess again and it can then try again,
+    # when it is more likely to succeed, for some reason.
     while True:
         try:
+            signal.alarm(2)
             mqtt_client.connect(controller_addr, MQTTServerPort)
             break
         except ConnectionRefusedError:
+            signal.alarm(0)
             log.e('connection refused')
             time.sleep(2)
 
+    signal.alarm(0)
+
     log.d('entering MQTT client loop')
     mqtt_client.loop_forever()
+
+def __signal_handler(signal_no, stack_frame):
+    '''Signal handler for the executor subprocess.
+
+    This is just used to handle the case if the MQTT connect hangs.
+    '''
+
+    if signal_no == signal.SIGALRM:
+        log.w('MQTT client did not connect in time; exiting...')
+        sys.exit(1)
+    else:
+        log.e('Unhandled signal {} define the executor signal handler.'.format(signal_no))
+        sys.exit(1)
 
 def __mqtt_on_connect(client, userdata, flags, rc):
     log.i('Connected to server with result: {}'.format(rc))
