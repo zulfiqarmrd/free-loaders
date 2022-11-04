@@ -1,9 +1,11 @@
 import argparse
 import time
 
+import config
 import executor
 import log
 import multiprocessing
+import os
 import service
 import signal
 import stats
@@ -16,7 +18,13 @@ __Children = {
 
 def main(args):
     __configure_signals()
-    log.set_level(args.log_level)
+
+    # Set the logging level as an environment variable.
+    if config.LoggingEnvVar not in os.environ:
+        os.environ[config.LoggingEnvVar] = args.log_level
+
+    # Perform boring configuration.
+    config.configure_process()
 
     threading.current_thread().name = 'top'
 
@@ -61,7 +69,8 @@ def __signal_handler(signal_no, stack_frame):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='fReeLoaders executor.')
     ap.add_argument('-l', '--log-level', help='Set the logging level.',
-                    metavar='LEVEL', choices=['e', 'w', 'i', 'd'])
+                    metavar='LEVEL', choices=['e', 'w', 'i', 'd'],
+                    dest='log_level', default='e')
     ap.add_argument('controller', help='Address of the controller.',
                     metavar='ADDR')
     ap.add_argument('id', help='ID the executor should use.',

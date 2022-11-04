@@ -1,12 +1,14 @@
 import json
 import log
 import multiprocessing
+import os
 import threading
 import time
 from multiprocessing import Process, Pipe
 
 import paho.mqtt.client
 
+import config
 import stats
 from tasker.loop import run_loop_task
 from tasker.mm import run_mm_task
@@ -41,11 +43,7 @@ def __executor_entry(controller_addr, executor_id, log_level):
     Spins of new threads to perform work.
     '''
 
-    multiprocessing.current_process().name = 'EXECUTOR'
-    this_thread = threading.current_thread()
-    this_thread.name = 'executor'
-
-    log.set_level(log_level)
+    config.configure_process('executor')
 
     log.i('started')
 
@@ -57,7 +55,7 @@ def __executor_entry(controller_addr, executor_id, log_level):
     log.i('connecting to {}:{}'.format(controller_addr, MQTTServerPort))
     while True:
         try:
-            mqtt_client.connect(controller_addr, MQTTServerPort, 60)
+            mqtt_client.connect(controller_addr, MQTTServerPort)
             break
         except ConnectionRefusedError:
             log.e('connection refused')
@@ -72,7 +70,6 @@ def __mqtt_on_connect(client, userdata, flags, rc):
 
 def __mqtt_on_disconnect(client, userdata, rc=0):
     log.w('Disconnected from server: {}'.format(rc))
-    client.loop_stop()
 
 def __mqtt_message_received(client, data, msg):
     log.i('received message (on {})'.format(msg.topic))
@@ -141,6 +138,8 @@ def __process_task_entry(pipe, task_request):
 
     Executes the task and sends the result and state to the controller.
     '''
+
+    config.configure_process()
 
     log.i('executing task')
     # Execute task here.

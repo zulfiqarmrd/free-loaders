@@ -13,6 +13,8 @@ def set_level(level_char):
         __LogLevel = 2
     elif level_char == 'd':
         __LogLevel = 3
+    else:
+        raise ValueError('Bad logging level: {}'.format(level_char))
 
 def e(msg):
     _log(0, msg)
