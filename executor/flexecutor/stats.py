@@ -16,6 +16,7 @@ def start_gpu_monitor_thread():
 
     t = threading.Thread(name='gpu-monitor',
                          target=__gpu_load_entry)
+    t.daemon = True
     t.start()
 
     return t

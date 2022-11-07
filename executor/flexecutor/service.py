@@ -33,6 +33,7 @@ def start_state_server():
     log.i('Launching executor HTTP server.')
     t = threading.Thread(name='state-http-server',
                          target=__state_server_entry)
+    t.daemon = True
     t.start()
 
     return t

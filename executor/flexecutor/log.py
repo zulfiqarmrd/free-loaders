@@ -13,6 +13,8 @@ def set_level(level_char):
         __LogLevel = 2
     elif level_char == 'd':
         __LogLevel = 3
+    else:
+        raise ValueError('Bad logging level: {}'.format(level_char))
 
 def e(msg):
     _log(0, msg)
@@ -38,8 +40,8 @@ def _log(level, msg):
 
     this_thread = threading.current_thread()
     thread_name = this_thread.name
-    if this_thread.ident == threading.main_thread().ident:
-        thread_name = 'MAIN'
+    if this_thread.ident == threading.main_thread().ident and not thread_name.startswith('Thread-'):
+        thread_name = 'MAIN-{}'.format(thread_name)
 
     if level <= __LogLevel:
         print('[{}][{}] - {}'.format(
