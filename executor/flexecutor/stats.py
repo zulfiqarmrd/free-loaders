@@ -76,6 +76,8 @@ def _process_thread_count():
 
 # Path to the NVIDIA SMI binary.
 __NVIDIASMIPath = '/usr/bin/nvidia-smi'
+# Path to the tegrastats binary.
+__TegraStatsPath = '/usr/bin/tegrastats'
 
 def _gpu_stats():
     '''Fetch GPU usage information, if available.
@@ -94,12 +96,10 @@ def _gpu_stats():
     if os.uname().release.endswith('-tegra'):
         import jtop
         stats['has-gpu'] = 1
-        with jtop.jtop() as jetson_ctx:
-            if jetson_ctx.ok():
-                stats['load'] = _get_gpu_load()
-                # Note: SoC shares RAM between CPU and GPU.
-                stats['free-vram'] = jetson_ctx.stats['RAM']
-                stats['total-vram'] = psutil.virtual_memory().total
+        stats['load'] = _get_gpu_load()
+        # Note: SoC shares RAM between CPU and GPU.
+        stats['free-vram'] = 1024768
+        stats['total-vram'] = 2048000
     elif os.path.exists(__NVIDIASMIPath):
         cp = subprocess.run([__NVIDIASMIPath], capture_output=True)
         m = re.search('(?P<free>[0-9]+)MiB */ * (?P<total>[0-9]+)MiB',
@@ -131,35 +131,47 @@ def __gpu_load_entry():
 
     log.i('started')
 
+    # Jetson SBCs
     if os.uname().release.endswith('-tegra'):
-        # Collect load information.
-        import jtop
-        while True:
-            jetson_ctx = jtop.jtop()
+        counter = 0
+        max_util = 0
+        # Start tegrastats as a subprocess.
+        cmd = [__TegraStatsPath, '--interval', str(100)]
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, encoding='utf-8') as tegrastats_proc:
+            # Collect load information.
+            while True:
+                output_line = tegrastats_proc.stdout.readline()
+                m = re.search('GR3D_FREQ (?P<utilization>[0-9]{1,2})%', output_line)
+                if m != None:
+                    if max_util < int(m['utilization']):
+                        max_util = int(m['utilization'])
+                    counter = counter + 100
+                    if counter / 1000.0 > __GPULoadCollectInterval:
+                        counter = 0
+                    else:
+                        continue
 
-            # Check to see if the thread is running,
-            # and start it if it is not.
-            if not jetson_ctx.is_alive():
-                jetson_ctx.start()
+                    current_gpu_usage = max_util / 100
+                    max_util = 0
+                    print('GPU usage: {}'.format(current_gpu_usage))
 
-            if jetson_ctx.ok():
-                current_gpu_usage = jetson_ctx.stats['GPU']
-                if __GPUUsagesCollected < __GPULoadHistory:
-                    __GPUUsagesCollected = __GPUUsagesCollected + 1
+                    if __GPUUsagesCollected < __GPULoadHistory:
+                        __GPUUsagesCollected = __GPUUsagesCollected + 1
 
-                __GPULoadLock.acquire()
-                if __GPUUsagesCollected == 1:
-                    __GPULoad = current_gpu_usage
+                    if __GPULoadLock.acquire(block=True, timeout=2) == True:
+                        if __GPUUsagesCollected == 1:
+                            __GPULoad = current_gpu_usage
+                        else:
+                            __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_gpu_usage * (1.0 / __GPULoadHistory))
+                            log.d('GPU load: {}'.format(__GPULoad))
+                        __GPULoadLock.release()
+                    else:
+                        log.e('unable to acquire GPU load lock; continuing')
                 else:
-                    __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_gpu_usage * (1.0 / __GPULoadHistory))
-                __GPULoadLock.release()
-            else:
-                log.e('unable to collect GPU load data')
-                time.sleep(3)
-            jetson_ctx.close()
+                    log.e('unable to collect GPU load data (line: "{}")'.format(output_line))
+                    return
 
-            # Wait before collecting more GPU load data.
-            time.sleep(__GPULoadCollectInterval)
+    # NVIDIA GPU-equipped computers
     elif os.path.exists(__NVIDIASMIPath):
         # Use NVIDIA SMI utility to get GPU information.
         log.i('Using nvidia-smi to get GPU information')
