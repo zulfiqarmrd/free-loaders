@@ -39,6 +39,11 @@ def fetch():
     (proc_count, thread_count) = _process_thread_count()
     gpu_stats = _gpu_stats()
 
+    # Fill in the VRAM stats if it is shared.
+    if _gpu_stats['free-vram'] = None:
+        gpu_stats['free-vram'] = mem.available
+        gpu_stats['total-vram'] = mem.total
+
     state = {
         'cpu-count': os.cpu_count(),
         'cpu-load': psutil.getloadavg()[0],
@@ -98,8 +103,9 @@ def _gpu_stats():
         stats['has-gpu'] = 1
         stats['load'] = _get_gpu_load()
         # Note: SoC shares RAM between CPU and GPU.
-        stats['free-vram'] = 1024768
-        stats['total-vram'] = 2048000
+        # Use None to tell the caller that this is the same as RAM.
+        stats['free-vram'] = None
+        stats['total-vram'] = None
     elif os.path.exists(__NVIDIASMIPath):
         cp = subprocess.run([__NVIDIASMIPath], capture_output=True)
         m = re.search('(?P<free>[0-9]+)MiB */ * (?P<total>[0-9]+)MiB',
