@@ -153,7 +153,6 @@ def __gpu_load_entry():
 
                     current_gpu_usage = max_util / 100
                     max_util = 0
-                    print('GPU usage: {}'.format(current_gpu_usage))
 
                     if __GPUUsagesCollected < __GPULoadHistory:
                         __GPUUsagesCollected = __GPUUsagesCollected + 1
@@ -163,7 +162,6 @@ def __gpu_load_entry():
                             __GPULoad = current_gpu_usage
                         else:
                             __GPULoad = (__GPULoad * (__GPUUsagesCollected - 1) / __GPUUsagesCollected) + (current_gpu_usage * (1.0 / __GPULoadHistory))
-                            log.d('GPU load: {}'.format(__GPULoad))
                         __GPULoadLock.release()
                     else:
                         log.e('unable to acquire GPU load lock; continuing')
