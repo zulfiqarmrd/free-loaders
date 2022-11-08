@@ -40,7 +40,7 @@ def fetch():
     gpu_stats = _gpu_stats()
 
     # Fill in the VRAM stats if it is shared.
-    if _gpu_stats['free-vram'] == None:
+    if gpu_stats['free-vram'] == None:
         gpu_stats['free-vram'] = mem.available
         gpu_stats['total-vram'] = mem.total
 
